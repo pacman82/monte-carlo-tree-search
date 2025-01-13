@@ -9,24 +9,10 @@ fn play_move_connect_four() {
 
     let game = ConnectFour::new();
 
-    let mut tree = Tree::new(game);
-    let mut max_path_length = 0;
     let num_playouts = 100;
 
-    for _ in 0..num_playouts {
-        let mut path = tree.select_leaf(&mut rng);
+    let tree = build_tree(game, num_playouts, &mut rng);
 
-        let mut simulated_game = game;
-        let next_move = tree.expand(&path, &mut simulated_game, &mut rng);
-        path.push(next_move);
-        max_path_length = max_path_length.max(path.len());
-
-        let score = simulation(simulated_game, &mut rng);
-        tree.backpropagation(&path, score);
-    }
-
-    eprintln!("Max path length: {}", max_path_length);
-    eprintln!("Score root: {:?}", tree.score);
     for (child, move_) in &tree.children {
         eprintln!(
             "Score child {:?}: {:?}",
@@ -34,6 +20,36 @@ fn play_move_connect_four() {
             child.as_ref().map(|c| c.score)
         );
     }
+}
+
+#[test]
+fn start_from_terminal_position() {
+    let mut rng = StdRng::seed_from_u64(42);
+
+    // First player has won
+    let game = ConnectFour::from_move_list("1212121");
+
+    let num_playouts = 5;
+
+    let tree = build_tree(game, num_playouts, &mut rng);
+
+    assert_eq!(Score { wins_player_1: 5, wins_player_2: 0, draws: 0 }, tree.score);
+}
+
+pub fn build_tree(game: ConnectFour, num_playouts: u32, rng: &mut impl Rng) -> Tree {
+    let mut tree = Tree::new(game);
+    for _ in 0..num_playouts {
+        let mut path = tree.select_leaf(rng);
+
+        let mut simulated_game = game;
+        if let Some(next_move) = tree.expand(&path, &mut simulated_game, rng) {
+            path.push(next_move);
+        }
+
+        let score = simulation(simulated_game, rng);
+        tree.backpropagation(&path, score);
+    }
+    tree
 }
 
 /// Play random moves, until the game is over and report the score
@@ -56,7 +72,7 @@ pub fn simulation(mut game: ConnectFour, rng: &mut impl Rng) -> Score {
     score
 }
 
-#[derive(Default, Clone, Copy, Debug)]
+#[derive(Default, Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Score {
     pub wins_player_1: u32,
     pub wins_player_2: u32,
@@ -79,7 +95,11 @@ pub struct Tree {
 
 impl Tree {
     pub fn new(game: ConnectFour) -> Self {
-        let children = game.legal_moves().map(|move_| (None, move_)).collect();
+        let children = if game.is_over() {
+            Vec::new()
+        } else {
+            game.legal_moves().map(|move_| (None, move_)).collect()
+        };
         Self {
             score: Score::default(),
             children,
@@ -110,7 +130,7 @@ impl Tree {
         path: &[Column],
         game: &mut ConnectFour,
         rng: &mut impl Rng,
-    ) -> Column {
+    ) -> Option<Column> {
         let mut current = self;
         for move_ in path {
             let (child, _move) = current
@@ -126,17 +146,19 @@ impl Tree {
             .iter_mut()
             .filter(|(tree, _column)| tree.is_none())
             .collect();
-        let (child, move_) = candidates
-            .choose_mut(rng)
-            .expect("Candidates must not be empty");
-        game.play(*move_);
-        *child = Some(Tree::new(*game));
-        *move_
+        if let Some((child, move_)) = candidates.choose_mut(rng) {
+            game.play(*move_);
+            *child = Some(Tree::new(*game));
+            Some(*move_)
+        } else {
+            // Selected child has been in a terminal state
+            None
+        }
     }
 
-    /// A leaf is any node with unexplored children.
+    /// A leaf is any node with on children or unexplored children
     pub fn is_leaf(&self) -> bool {
-        self.children.iter().any(|(child, _)| child.is_none())
+        self.children.iter().any(|(child, _)| child.is_none()) || self.children.is_empty()
     }
 
     pub fn backpropagation(&mut self, path: &[Column], score: Score) {
