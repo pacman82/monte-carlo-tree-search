@@ -1,6 +1,6 @@
 use std::{mem, ops::AddAssign};
 
-use connect_four_solver::{Column, ConnectFour};
+use connect_four_solver::{Column, ConnectFour, Solver};
 use rand::{rngs::StdRng, seq::SliceRandom, Rng, SeedableRng};
 
 #[test]
@@ -39,6 +39,34 @@ fn start_from_terminal_position() {
     );
 }
 
+#[test]
+fn play_against_perfect_solver_as_player_one() {
+    let mut rng = StdRng::seed_from_u64(42);
+
+    let mut game = ConnectFour::new();
+    let mut solver = Solver::new();
+    let mut moves = Vec::new();
+
+    while !game.is_over() {
+        let next_move = if game.stones() % 2 == 0 {
+            let num_playouts = 100;
+            let tree = Tree::with_playouts(game, num_playouts, &mut rng);
+            tree.children.iter().max_by(|(child_a, _), (child_b, _)| {
+                let a = child_a.as_ref().unwrap().score.accumulated();
+                let b = child_b.as_ref().unwrap().score.accumulated();
+                a.partial_cmp(&b).unwrap()
+            }).unwrap().1
+        } else {
+            solver.best_moves(&game, &mut moves);
+            *moves.choose(&mut rng).unwrap()
+        };
+        eprintln!("column: {next_move}");
+        game.play(next_move);
+        eprintln!("{game}");
+    }
+
+}
+
 /// Play random moves, until the game is over and report the score
 pub fn simulation(mut game: ConnectFour, rng: &mut impl Rng) -> Score {
     let stones_begin = game.stones();
@@ -74,16 +102,13 @@ impl Score {
     /// Assign a score of 1 for winning, 0 for loosing and 0.5 for a draw. Divided by the number of
     /// playouts. Zero playouts will result in a score of 0.
     pub fn accumulated(&self) -> f32 {
-        (self.wins_current_player as f32 + self.draws as f32)
+        (self.wins_current_player as f32 + self.draws as f32 * 0.5)
             / (self.wins_current_player + self.wins_other_player + self.draws) as f32
     }
 
     /// The score from the other players perspective
     fn flip_players(&mut self) {
-        mem::swap(
-            &mut self.wins_current_player,
-            &mut self.wins_other_player,
-        );
+        mem::swap(&mut self.wins_current_player, &mut self.wins_other_player);
     }
 }
 

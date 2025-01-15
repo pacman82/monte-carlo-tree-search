@@ -16,9 +16,9 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
 name = "connect-four-solver"
-version = "0.2.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "115a78916740ae3d7cae935666f8716ae20e24f3bf7a9e85a409d0d79d1f85b1"
+checksum = "07ea474eec9eede2d47921d2e8591863f7a0146ccbfcb48338f4a6ec3ffecdc9"
 
 [[package]]
 name = "getrandom"

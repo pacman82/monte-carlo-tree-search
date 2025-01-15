@@ -7,4 +7,4 @@ edition = "2021"
 rand = "0.8.5"
 
 [dev-dependencies]
-connect-four-solver = "0.2.0"
+connect-four-solver = "0.2.1"
