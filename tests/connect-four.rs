@@ -107,8 +107,18 @@ impl Score {
     }
 
     /// The score from the other players perspective
-    fn flip_players(&mut self) {
+    pub fn flip_players(&mut self) {
         mem::swap(&mut self.wins_current_player, &mut self.wins_other_player);
+    }
+
+    /// Upper confidence bound. Used to select a leave during selection phase. `c` balances between
+    /// exploration and exploitation.
+    pub fn ucb(&self, total_visits_parent: f32, c: f32) -> f32 {
+        self.accumulated() + c * (total_visits_parent.ln() / self.total() as f32).sqrt()
+    }
+
+    fn total(&self) -> u32 {
+        self.wins_current_player + self.wins_other_player + self.draws
     }
 }
 
@@ -149,7 +159,7 @@ impl Tree {
 
     /// Playout one cycle of selection, expansion, simulation and backpropagation.
     pub fn playout(&mut self, root_game: ConnectFour, rng: &mut impl Rng) {
-        let mut path = self.select_leaf(rng);
+        let mut path = self.select_leaf();
 
         let mut simulated_game = root_game;
         if let Some(next_move) = self.expand(&path, &mut simulated_game, rng) {
@@ -165,13 +175,17 @@ impl Tree {
     /// # Return
     ///
     /// The path from the root to the selected leaf.
-    pub fn select_leaf(&self, rng: &mut impl Rng) -> Vec<Column> {
+    pub fn select_leaf(&self) -> Vec<Column> {
         let mut current = self;
         let mut path = Vec::new();
         while !current.is_leaf() {
             let (child, move_) = current
                 .children
-                .choose(rng)
+                .iter().max_by(|a, b| {
+                    let a = a.0.as_ref().unwrap().score.ucb(current.score.total() as f32, 1.0f32);
+                    let b = b.0.as_ref().unwrap().score.ucb(current.score.total() as f32, 1.0f32);
+                    a.partial_cmp(&b).unwrap()
+                })
                 .expect("Children must not be empty");
             path.push(*move_);
             current = child.as_ref().expect("Child must be Some");
