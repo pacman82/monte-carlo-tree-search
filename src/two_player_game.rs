@@ -5,9 +5,9 @@ pub trait TwoPlayerGame: Clone {
     type Move;
 
     /// Current state of the game yields terminal state or valid moves.
-    /// 
+    ///
     /// # Parameters
-    /// 
+    ///
     /// * `moves_buf`: In order to avoid repeated allocations to store legal moves, callers supply
     ///   a buffer to hold the to the method. The buffer will always contain a complete and
     ///   exclusive list of all valid moves after the call. This implies it being empty in case of

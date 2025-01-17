@@ -15,8 +15,7 @@ impl Count {
     /// Assign a score of 1 for winning, 0 for loosing and 0.5 for a draw. Divided by the number of
     /// playouts. Zero playouts will result in a score of 0.
     pub fn score(&self) -> f32 {
-        (self.wins_current_player as f32 + self.draws as f32 * 0.5)
-            / self.total() as f32
+        (self.wins_current_player as f32 + self.draws as f32 * 0.5) / self.total() as f32
     }
 
     /// The score from the other players perspective. Useful during backpropagation, if we want to

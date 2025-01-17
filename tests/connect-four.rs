@@ -160,7 +160,10 @@ pub struct Tree<Move> {
     children: Vec<(Option<Self>, Move)>,
 }
 
-impl<Move> Tree<Move> where Move: Copy + Eq{
+impl<Move> Tree<Move>
+where
+    Move: Copy + Eq,
+{
     pub fn new(game: impl TwoPlayerGame<Move = Move>) -> Self {
         let mut moves_buf = Vec::new();
         game.state(&mut moves_buf);
@@ -170,7 +173,11 @@ impl<Move> Tree<Move> where Move: Copy + Eq{
         }
     }
 
-    pub fn with_playouts(game: impl TwoPlayerGame<Move = Move>, num_playouts: u32, rng: &mut impl Rng) -> Self {
+    pub fn with_playouts(
+        game: impl TwoPlayerGame<Move = Move>,
+        num_playouts: u32,
+        rng: &mut impl Rng,
+    ) -> Self {
         let mut tree = Self::new(game.clone());
         for _ in 0..num_playouts {
             tree.playout(game.clone(), rng);
@@ -226,7 +233,7 @@ impl<Move> Tree<Move> where Move: Copy + Eq{
     pub fn expand(
         &mut self,
         path: &[Move],
-        game: &mut impl TwoPlayerGame<Move=Move>,
+        game: &mut impl TwoPlayerGame<Move = Move>,
         rng: &mut impl Rng,
     ) -> Option<Move> {
         let mut current = self;
