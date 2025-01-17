@@ -40,6 +40,7 @@ fn start_from_terminal_position() {
 }
 
 #[test]
+#[ignore = "Computes a long time. More a design exploration, than an actual test"]
 fn play_against_perfect_solver_as_player_one() {
     let mut rng = StdRng::seed_from_u64(42);
 
