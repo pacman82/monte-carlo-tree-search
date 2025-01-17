@@ -155,12 +155,12 @@ pub fn simulation(mut game: impl TwoPlayerGame, rng: &mut impl Rng) -> Count {
 }
 
 #[derive(Debug)]
-pub struct Tree<G: TwoPlayerGame> {
-    score: Count,
+pub struct Tree<G: TwoPlayerGame, S: Search> {
+    score: S::NodeState,
     children: Vec<(Option<Self>, G::Move)>,
 }
 
-impl<G> Tree<G> where G: TwoPlayerGame
+impl<G> Tree<G, Uct> where G: TwoPlayerGame
 {
     pub fn new(game: G) -> Self {
         let mut moves_buf = Vec::new();
@@ -281,4 +281,15 @@ impl<G> Tree<G> where G: TwoPlayerGame
             current.score += score;
         }
     }
+}
+
+trait Search {
+    type NodeState;
+}
+
+/// **U**pper **c**onfidence bound for **t**rees.
+struct Uct;
+
+impl Search for Uct {
+    type NodeState = Count;
 }
