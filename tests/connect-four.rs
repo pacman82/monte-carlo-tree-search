@@ -155,16 +155,14 @@ pub fn simulation(mut game: impl TwoPlayerGame, rng: &mut impl Rng) -> Count {
 }
 
 #[derive(Debug)]
-pub struct Tree<Move> {
+pub struct Tree<G: TwoPlayerGame> {
     score: Count,
-    children: Vec<(Option<Self>, Move)>,
+    children: Vec<(Option<Self>, G::Move)>,
 }
 
-impl<Move> Tree<Move>
-where
-    Move: Copy + Eq,
+impl<G> Tree<G> where G: TwoPlayerGame
 {
-    pub fn new(game: impl TwoPlayerGame<Move = Move>) -> Self {
+    pub fn new(game: G) -> Self {
         let mut moves_buf = Vec::new();
         game.state(&mut moves_buf);
         Self {
@@ -174,7 +172,7 @@ where
     }
 
     pub fn with_playouts(
-        game: impl TwoPlayerGame<Move = Move>,
+        game: G,
         num_playouts: u32,
         rng: &mut impl Rng,
     ) -> Self {
@@ -186,7 +184,7 @@ where
     }
 
     /// Playout one cycle of selection, expansion, simulation and backpropagation.
-    pub fn playout(&mut self, root_game: impl TwoPlayerGame<Move = Move>, rng: &mut impl Rng) {
+    pub fn playout(&mut self, root_game: G, rng: &mut impl Rng) {
         let mut path = self.select_leaf();
 
         let mut simulated_game = root_game;
@@ -203,7 +201,7 @@ where
     /// # Return
     ///
     /// The path from the root to the selected leaf.
-    pub fn select_leaf(&self) -> Vec<Move> {
+    pub fn select_leaf(&self) -> Vec<G::Move> {
         let mut current = self;
         let mut path = Vec::new();
         while !current.is_leaf() {
@@ -224,7 +222,7 @@ where
                     a.partial_cmp(&b).unwrap()
                 })
                 .expect("Children must not be empty");
-            path.push(*move_);
+            path.push(move_.clone());
             current = child.as_ref().expect("Child must be Some");
         }
         path
@@ -232,10 +230,10 @@ where
 
     pub fn expand(
         &mut self,
-        path: &[Move],
-        game: &mut impl TwoPlayerGame<Move = Move>,
+        path: &[G::Move],
+        game: &mut G,
         rng: &mut impl Rng,
-    ) -> Option<Move> {
+    ) -> Option<G::Move> {
         let mut current = self;
         for move_ in path {
             let (child, _move) = current
@@ -254,7 +252,7 @@ where
         if let Some((child, move_)) = candidates.choose_mut(rng) {
             game.play(move_);
             *child = Some(Tree::new(game.clone()));
-            Some(*move_)
+            Some(move_.clone())
         } else {
             // Selected child has been in a terminal state
             None
@@ -266,7 +264,7 @@ where
         self.children.iter().any(|(child, _)| child.is_none()) || self.children.is_empty()
     }
 
-    pub fn backpropagation(&mut self, path: &[Move], mut score: Count) {
+    pub fn backpropagation(&mut self, path: &[G::Move], mut score: Count) {
         let mut current = self;
         current.score += score;
         if path.len() % 2 == 0 {
