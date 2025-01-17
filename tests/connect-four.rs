@@ -1,5 +1,4 @@
-use std::{mem, ops::AddAssign};
-
+use monte_carlo_tree_search::Count;
 use connect_four_solver::{Column, ConnectFour, Solver};
 use rand::{rngs::StdRng, seq::SliceRandom, Rng, SeedableRng};
 
@@ -30,7 +29,7 @@ fn start_from_terminal_position() {
     let tree = Tree::with_playouts(game, num_playouts, &mut rng);
 
     assert_eq!(
-        Score {
+        Count {
             wins_current_player: 0,
             wins_other_player: 5,
             draws: 0
@@ -53,8 +52,8 @@ fn play_against_perfect_solver_as_player_one() {
             let num_playouts = 100;
             let tree = Tree::with_playouts(game, num_playouts, &mut rng);
             tree.children.iter().max_by(|(child_a, _), (child_b, _)| {
-                let a = child_a.as_ref().unwrap().score.accumulated();
-                let b = child_b.as_ref().unwrap().score.accumulated();
+                let a = child_a.as_ref().unwrap().score.score();
+                let b = child_b.as_ref().unwrap().score.score();
                 a.partial_cmp(&b).unwrap()
             }).unwrap().1
         } else {
@@ -69,14 +68,14 @@ fn play_against_perfect_solver_as_player_one() {
 }
 
 /// Play random moves, until the game is over and report the score
-pub fn simulation(mut game: ConnectFour, rng: &mut impl Rng) -> Score {
+pub fn simulation(mut game: ConnectFour, rng: &mut impl Rng) -> Count {
     let stones_begin = game.stones();
     while !game.is_over() {
         let candidates: Vec<_> = game.legal_moves().collect();
         let selected_move = *candidates.choose(rng).unwrap();
         game.play(selected_move);
     }
-    let mut score = Score::default();
+    let mut score = Count::default();
     if game.is_victory() {
         if game.stones() % 2 == stones_begin % 2 {
             score.wins_other_player = 1;
@@ -89,51 +88,9 @@ pub fn simulation(mut game: ConnectFour, rng: &mut impl Rng) -> Score {
     score
 }
 
-/// Score relative to the current player.
-#[derive(Default, Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Score {
-    /// Number of wins for the player who is about to make the next turn
-    pub wins_current_player: u32,
-    /// Number of wins for the other player, who is waiting for his/her turn
-    pub wins_other_player: u32,
-    pub draws: u32,
-}
-
-impl Score {
-    /// Assign a score of 1 for winning, 0 for loosing and 0.5 for a draw. Divided by the number of
-    /// playouts. Zero playouts will result in a score of 0.
-    pub fn accumulated(&self) -> f32 {
-        (self.wins_current_player as f32 + self.draws as f32 * 0.5)
-            / (self.wins_current_player + self.wins_other_player + self.draws) as f32
-    }
-
-    /// The score from the other players perspective
-    pub fn flip_players(&mut self) {
-        mem::swap(&mut self.wins_current_player, &mut self.wins_other_player);
-    }
-
-    /// Upper confidence bound. Used to select a leave during selection phase. `c` balances between
-    /// exploration and exploitation.
-    pub fn ucb(&self, total_visits_parent: f32, c: f32) -> f32 {
-        self.accumulated() + c * (total_visits_parent.ln() / self.total() as f32).sqrt()
-    }
-
-    fn total(&self) -> u32 {
-        self.wins_current_player + self.wins_other_player + self.draws
-    }
-}
-
-impl AddAssign for Score {
-    fn add_assign(&mut self, other: Self) {
-        self.wins_current_player += other.wins_current_player;
-        self.wins_other_player += other.wins_other_player;
-        self.draws += other.draws;
-    }
-}
-
 #[derive(Debug)]
 pub struct Tree {
-    score: Score,
+    score: Count,
     children: Vec<(Option<Tree>, Column)>,
 }
 
@@ -145,7 +102,7 @@ impl Tree {
             game.legal_moves().map(|move_| (None, move_)).collect()
         };
         Self {
-            score: Score::default(),
+            score: Count::default(),
             children,
         }
     }
@@ -230,7 +187,7 @@ impl Tree {
         self.children.iter().any(|(child, _)| child.is_none()) || self.children.is_empty()
     }
 
-    pub fn backpropagation(&mut self, path: &[Column], mut score: Score) {
+    pub fn backpropagation(&mut self, path: &[Column], mut score: Count) {
         let mut current = self;
         current.score += score;
         if path.len() % 2 == 0 {
