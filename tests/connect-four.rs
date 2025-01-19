@@ -160,23 +160,28 @@ pub struct Tree<G: TwoPlayerGame, S: Search> {
     children: Vec<(Option<Self>, G::Move)>,
 }
 
-impl<G> Tree<G, Uct> where G: TwoPlayerGame
+impl<G, S> Tree<G, S>
+where
+    G: TwoPlayerGame,
+    S: Search,
 {
-    pub fn new(game: G) -> Self {
-        let mut moves_buf = Vec::new();
-        game.state(&mut moves_buf);
+    pub fn new(moves: impl Iterator<Item = G::Move>, bias: S::NodeState) -> Self {
         Self {
-            score: Count::default(),
-            children: moves_buf.into_iter().map(|move_| (None, move_)).collect(),
+            score: bias,
+            children: moves.map(|move_| (None, move_)).collect(),
         }
     }
+}
 
-    pub fn with_playouts(
-        game: G,
-        num_playouts: u32,
-        rng: &mut impl Rng,
-    ) -> Self {
-        let mut tree = Self::new(game.clone());
+impl<G> Tree<G, Uct>
+where
+    G: TwoPlayerGame,
+{
+    pub fn with_playouts(game: G, num_playouts: u32, rng: &mut impl Rng) -> Self {
+        let mut moves_buf = Vec::new();
+        game.state(&mut moves_buf);
+        let bias = simulation(game.clone(), rng);
+        let mut tree = Self::new(moves_buf.iter().cloned(), bias);
         for _ in 0..num_playouts {
             tree.playout(game.clone(), rng);
         }
@@ -187,13 +192,14 @@ impl<G> Tree<G, Uct> where G: TwoPlayerGame
     pub fn playout(&mut self, root_game: G, rng: &mut impl Rng) {
         let mut path = self.select_leaf();
 
-        let mut simulated_game = root_game;
-        if let Some(next_move) = self.expand(&path, &mut simulated_game, rng) {
+        let bias = if let Some((next_move, bias)) = self.expand(&path, root_game.clone(), rng) {
             path.push(next_move);
-        }
+            bias
+        } else {
+            simulation(root_game, rng)
+        };
 
-        let score = simulation(simulated_game, rng);
-        self.backpropagation(&path, score);
+        self.backpropagation(&path, bias);
     }
 
     /// Selects a leaf of the tree.
@@ -231,9 +237,9 @@ impl<G> Tree<G, Uct> where G: TwoPlayerGame
     pub fn expand(
         &mut self,
         path: &[G::Move],
-        game: &mut G,
+        mut game: G,
         rng: &mut impl Rng,
-    ) -> Option<G::Move> {
+    ) -> Option<(G::Move, Count)> {
         let mut current = self;
         for move_ in path {
             let (child, _move) = current
@@ -251,8 +257,11 @@ impl<G> Tree<G, Uct> where G: TwoPlayerGame
             .collect();
         if let Some((child, move_)) = candidates.choose_mut(rng) {
             game.play(move_);
-            *child = Some(Tree::new(game.clone()));
-            Some(move_.clone())
+            let mut moves = Vec::new();
+            game.state(&mut moves);
+            let bias = simulation(game, rng);
+            *child = Some(Tree::new(moves.into_iter(), bias));
+            Some((move_.clone(), bias))
         } else {
             // Selected child has been in a terminal state
             None
@@ -283,8 +292,10 @@ impl<G> Tree<G, Uct> where G: TwoPlayerGame
     }
 }
 
-trait Search {
+pub trait Search {
     type NodeState;
+
+    fn bias(board: &impl TwoPlayerGame, rng: &mut impl Rng) -> Self::NodeState;
 }
 
 /// **U**pper **c**onfidence bound for **t**rees.
@@ -292,4 +303,8 @@ struct Uct;
 
 impl Search for Uct {
     type NodeState = Count;
+
+    fn bias(board: &impl TwoPlayerGame, rng: &mut impl Rng) -> Count {
+        simulation(board.clone(), rng)
+    }
 }
