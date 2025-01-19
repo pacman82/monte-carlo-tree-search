@@ -1,7 +1,7 @@
 use std::fmt::{self, Display};
 
 use connect_four_solver::{Column, Solver};
-use monte_carlo_tree_search::{Count, GameState, TwoPlayerGame};
+use monte_carlo_tree_search::{simulation, Count, GameState, TwoPlayerGame};
 use rand::{rngs::StdRng, seq::SliceRandom, Rng, SeedableRng};
 
 #[test]
@@ -119,41 +119,6 @@ impl TwoPlayerGame for ConnectFour {
     }
 }
 
-/// Play random moves, until the game is over and report the score
-pub fn simulation(mut game: impl TwoPlayerGame, rng: &mut impl Rng) -> Count {
-    let start_player = game.current_player();
-    let mut moves_buf = Vec::new();
-    loop {
-        match game.state(&mut moves_buf) {
-            GameState::Moves(legal_moves) => {
-                let selected_move = legal_moves.choose(rng).unwrap();
-                game.play(selected_move)
-            }
-            GameState::Win => {
-                break Count {
-                    wins_current_player: (start_player == game.current_player()) as u32,
-                    wins_other_player: (start_player != game.current_player()) as u32,
-                    draws: 0,
-                }
-            }
-            GameState::Loss => {
-                break Count {
-                    wins_current_player: (start_player != game.current_player()) as u32,
-                    wins_other_player: (start_player == game.current_player()) as u32,
-                    draws: 0,
-                }
-            }
-            GameState::Draw => {
-                break Count {
-                    wins_current_player: 0,
-                    wins_other_player: 0,
-                    draws: 1,
-                }
-            }
-        }
-    }
-}
-
 #[derive(Debug)]
 pub struct Tree<G: TwoPlayerGame, S: Search> {
     score: S::NodeState,
@@ -182,7 +147,7 @@ where
         game.state(&mut moves_buf);
         let bias = simulation(game.clone(), rng);
         let mut tree = Self::new(moves_buf.iter().cloned(), bias);
-        for _ in 0..num_playouts {
+        for _ in 1..num_playouts {
             tree.playout(game.clone(), rng);
         }
         tree
