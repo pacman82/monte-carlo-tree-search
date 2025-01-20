@@ -11,7 +11,7 @@ pub struct Count {
 impl Count {
     /// Assign a score of 1 for winning, 0 for loosing and 0.5 for a draw. Divided by the number of
     /// playouts. Zero playouts will result in a score of 0.
-    pub fn score(&self, player: u8) -> f32 {
+    pub fn reward(&self, player: u8) -> f32 {
         if player == 0 {
             (self.wins_player_one as f32 + self.draws as f32 * 0.5) / self.total() as f32
         } else {
@@ -23,7 +23,7 @@ impl Count {
     /// Upper confidence bound. Used to select which leaf to explore next. Formula balances
     /// exploration with exploitation.
     pub fn ucb(&self, total_visits_parent: f32, player: u8) -> f32 {
-        self.score(player) + (2f32 * total_visits_parent.ln() / self.total() as f32).sqrt()
+        self.reward(player) + (2f32 * total_visits_parent.ln() / self.total() as f32).sqrt()
     }
 
     /// Count of total playouts

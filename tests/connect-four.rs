@@ -14,9 +14,10 @@ fn play_move_connect_four() {
 
     for (child, move_) in &tree.children {
         eprintln!(
-            "Score child {:?}: {:?}",
+            "Score child {:?}: {:?} Reward: {:?}",
             move_,
-            child.as_ref().map(|c| c.score)
+            child.as_ref().map(|c| c.count),
+            child.as_ref().map(|c| c.count.reward(0))
         );
     }
 }
@@ -36,12 +37,12 @@ fn start_from_terminal_position() {
             wins_player_two: 0,
             draws: 0
         },
-        tree.score
+        tree.count
     );
 }
 
 #[test]
-#[ignore = "Computes a long time. More a design exploration, than an actual test"]
+// #[ignore = "Computes a long time. More a design exploration, than an actual test"]
 fn play_against_perfect_solver_as_player_one() {
     let mut rng = StdRng::seed_from_u64(42);
 
@@ -56,8 +57,8 @@ fn play_against_perfect_solver_as_player_one() {
             tree.children
                 .iter()
                 .max_by(|(child_a, _), (child_b, _)| {
-                    let a = child_a.as_ref().unwrap().score.score(0);
-                    let b = child_b.as_ref().unwrap().score.score(0);
+                    let a = child_a.as_ref().unwrap().count.reward(0);
+                    let b = child_b.as_ref().unwrap().count.reward(0);
                     a.partial_cmp(&b).unwrap()
                 })
                 .unwrap()
@@ -124,34 +125,27 @@ impl TwoPlayerGame for ConnectFour {
 }
 
 #[derive(Debug)]
-pub struct Tree<G: TwoPlayerGame, S: Search> {
-    score: S::NodeState,
+pub struct Tree<G: TwoPlayerGame> {
+    count: Count,
     children: Vec<(Option<Self>, G::Move)>,
 }
 
-impl<G, S> Tree<G, S>
+impl<G> Tree<G>
 where
     G: TwoPlayerGame,
-    S: Search,
 {
-    pub fn new(moves: impl Iterator<Item = G::Move>, bias: S::NodeState) -> Self {
+    pub fn new(moves: impl Iterator<Item = G::Move>) -> Self {
         Self {
-            score: bias,
+            count: Count::default(),
             children: moves.map(|move_| (None, move_)).collect(),
         }
     }
-}
 
-impl<G> Tree<G, Uct>
-where
-    G: TwoPlayerGame,
-{
     pub fn with_playouts(game: G, num_playouts: u32, rng: &mut impl Rng) -> Self {
         let mut moves_buf = Vec::new();
         game.state(&mut moves_buf);
-        let bias = simulation(game.clone(), rng);
-        let mut tree = Self::new(moves_buf.iter().cloned(), bias);
-        for _ in 1..num_playouts {
+        let mut tree = Self::new(moves_buf.iter().cloned());
+        for _ in 0..num_playouts {
             tree.playout(game.clone(), rng);
         }
         tree
@@ -188,13 +182,13 @@ where
                     let a =
                         a.0.as_ref()
                             .unwrap()
-                            .score
-                            .ucb(current.score.total() as f32, game.current_player());
+                            .count
+                            .ucb(current.count.total() as f32, game.current_player());
                     let b =
                         b.0.as_ref()
                             .unwrap()
-                            .score
-                            .ucb(current.score.total() as f32, game.current_player());
+                            .count
+                            .ucb(current.count.total() as f32, game.current_player());
                     a.partial_cmp(&b).unwrap()
                 })
                 .expect("Children must not be empty");
@@ -219,7 +213,7 @@ where
             let mut moves = Vec::new();
             game.state(&mut moves);
             let bias = simulation(game, rng);
-            *child = Some(Tree::new(moves.into_iter(), bias));
+            *child = Some(Tree::new(moves.into_iter()));
             Some((move_.clone(), bias))
         } else {
             // Selected child has been in a terminal state
@@ -232,9 +226,9 @@ where
         self.children.iter().any(|(child, _)| child.is_none()) || self.children.is_empty()
     }
 
-    pub fn backpropagation(&mut self, path: &[G::Move], score: Count) {
+    pub fn backpropagation(&mut self, path: &[G::Move], count: Count) {
         let mut current = self;
-        current.score += score;
+        current.count += count;
         for move_ in path {
             let (child, _) = current
                 .children
@@ -242,24 +236,7 @@ where
                 .find(|(_, m)| m == move_)
                 .expect("Child must exist");
             current = child.as_mut().expect("Child must be Some");
-            current.score += score;
+            current.count += count;
         }
-    }
-}
-
-pub trait Search {
-    type NodeState;
-
-    fn bias(board: &impl TwoPlayerGame, rng: &mut impl Rng) -> Self::NodeState;
-}
-
-/// **U**pper **c**onfidence bound for **t**rees.
-struct Uct;
-
-impl Search for Uct {
-    type NodeState = Count;
-
-    fn bias(board: &impl TwoPlayerGame, rng: &mut impl Rng) -> Count {
-        simulation(board.clone(), rng)
     }
 }
