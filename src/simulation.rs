@@ -5,7 +5,6 @@ use crate::{Count, GameState, TwoPlayerGame};
 /// Play random moves, until the game is over and report the score from the perspective of the
 /// player whose turn it is.
 pub fn simulation(mut game: impl TwoPlayerGame, rng: &mut impl Rng) -> Count {
-    let start_player = game.current_player();
     let mut moves_buf = Vec::new();
     loop {
         match game.state(&mut moves_buf) {
@@ -13,24 +12,24 @@ pub fn simulation(mut game: impl TwoPlayerGame, rng: &mut impl Rng) -> Count {
                 let selected_move = legal_moves.choose(rng).unwrap();
                 game.play(selected_move)
             }
-            GameState::Win => {
+            GameState::WinPlayerOne => {
                 break Count {
-                    wins_current_player: (start_player == game.current_player()) as u32,
-                    wins_other_player: (start_player != game.current_player()) as u32,
+                    wins_player_one: 1,
+                    wins_player_two: 0,
                     draws: 0,
                 }
             }
-            GameState::Loss => {
+            GameState::WinPlayerTwo => {
                 break Count {
-                    wins_current_player: (start_player != game.current_player()) as u32,
-                    wins_other_player: (start_player == game.current_player()) as u32,
+                    wins_player_one: 0,
+                    wins_player_two: 1,
                     draws: 0,
                 }
             }
             GameState::Draw => {
                 break Count {
-                    wins_current_player: 0,
-                    wins_other_player: 0,
+                    wins_player_one: 0,
+                    wins_player_two: 0,
                     draws: 1,
                 }
             }

@@ -27,12 +27,7 @@ pub trait TwoPlayerGame: Clone {
 pub enum GameState<'a, Move> {
     /// Complete list of all legal moves for the current player
     Moves(&'a [Move]),
-    /// Current player won or, since there technically is no current player, the player playing the
-    /// last move lost.
-    Win,
-    /// Current player lost or, since there technically is no current player, the player playing the
-    /// last move won.
-    Loss,
-    /// Neither player one, the game is a draw
+    WinPlayerOne,
+    WinPlayerTwo,
     Draw,
 }

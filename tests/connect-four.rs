@@ -32,8 +32,8 @@ fn start_from_terminal_position() {
 
     assert_eq!(
         Count {
-            wins_current_player: 0,
-            wins_other_player: 5,
+            wins_player_one: 5,
+            wins_player_two: 0,
             draws: 0
         },
         tree.score
@@ -51,13 +51,13 @@ fn play_against_perfect_solver_as_player_one() {
 
     while !game.is_over() {
         let next_move = if game.stones() % 2 == 0 {
-            let num_playouts = 100;
+            let num_playouts = 1_000;
             let tree = Tree::with_playouts(ConnectFour(game), num_playouts, &mut rng);
             tree.children
                 .iter()
                 .max_by(|(child_a, _), (child_b, _)| {
-                    let a = child_a.as_ref().unwrap().score.score();
-                    let b = child_b.as_ref().unwrap().score.score();
+                    let a = child_a.as_ref().unwrap().score.score(0);
+                    let b = child_b.as_ref().unwrap().score.score(0);
                     a.partial_cmp(&b).unwrap()
                 })
                 .unwrap()
@@ -98,9 +98,13 @@ impl TwoPlayerGame for ConnectFour {
     fn state<'a>(&self, moves_buf: &'a mut Vec<Column>) -> GameState<'a, Column> {
         if self.0.is_victory() {
             // Convention for `GameState` is different than the one for `is_victory`. `is_victory`
-            // is from the perspective of the player which played the last stone, theras `GameState`
-            // is from the current players perspective
-            return GameState::Loss;
+            // is from the perspective of the player which played the last stone.
+            if self.0.stones() % 2 == 0 {
+                return GameState::WinPlayerTwo;
+            } else {
+                return GameState::WinPlayerOne;
+            }
+            
         }
         if self.0.stones() == 42 {
             return GameState::Draw;
@@ -155,9 +159,10 @@ where
 
     /// Playout one cycle of selection, expansion, simulation and backpropagation.
     pub fn playout(&mut self, root_game: G, rng: &mut impl Rng) {
-        let mut path = self.select_leaf();
+        let mut game = root_game.clone();
+        let (mut path, selected) = self.select_leaf(&mut game);
 
-        let bias = if let Some((next_move, bias)) = self.expand(&path, root_game.clone(), rng) {
+        let bias = if let Some((next_move, bias)) = selected.expand(game, rng) {
             path.push(next_move);
             bias
         } else {
@@ -172,50 +177,39 @@ where
     /// # Return
     ///
     /// The path from the root to the selected leaf.
-    pub fn select_leaf(&self) -> Vec<G::Move> {
+    pub fn select_leaf(&mut self, game: &mut G) -> (Vec<G::Move>, &mut Self) {
         let mut current = self;
         let mut path = Vec::new();
         while !current.is_leaf() {
             let (child, move_) = current
                 .children
-                .iter()
+                .iter_mut()
                 .max_by(|a, b| {
                     let a =
                         a.0.as_ref()
                             .unwrap()
                             .score
-                            .ucb(current.score.total() as f32);
+                            .ucb(current.score.total() as f32, game.current_player());
                     let b =
                         b.0.as_ref()
                             .unwrap()
                             .score
-                            .ucb(current.score.total() as f32);
+                            .ucb(current.score.total() as f32, game.current_player());
                     a.partial_cmp(&b).unwrap()
                 })
                 .expect("Children must not be empty");
             path.push(move_.clone());
-            current = child.as_ref().expect("Child must be Some");
+            current = child.as_mut().expect("Child must be Some");
         }
-        path
+        (path, current)
     }
 
     pub fn expand(
         &mut self,
-        path: &[G::Move],
         mut game: G,
         rng: &mut impl Rng,
     ) -> Option<(G::Move, Count)> {
-        let mut current = self;
-        for move_ in path {
-            let (child, _move) = current
-                .children
-                .iter_mut()
-                .find(|(_, m)| m == move_)
-                .expect("Child must exist");
-            game.play(move_);
-            current = child.as_mut().expect("Child must be Some");
-        }
-        let mut candidates: Vec<_> = current
+        let mut candidates: Vec<_> = self
             .children
             .iter_mut()
             .filter(|(tree, _column)| tree.is_none())
@@ -233,17 +227,14 @@ where
         }
     }
 
-    /// A leaf is any node with on children or unexplored children
+    /// A leaf is any node with no children or unexplored children
     pub fn is_leaf(&self) -> bool {
         self.children.iter().any(|(child, _)| child.is_none()) || self.children.is_empty()
     }
 
-    pub fn backpropagation(&mut self, path: &[G::Move], mut score: Count) {
+    pub fn backpropagation(&mut self, path: &[G::Move], score: Count) {
         let mut current = self;
         current.score += score;
-        if path.len() % 2 == 0 {
-            score.flip_players();
-        }
         for move_ in path {
             let (child, _) = current
                 .children
@@ -251,7 +242,6 @@ where
                 .find(|(_, m)| m == move_)
                 .expect("Child must exist");
             current = child.as_mut().expect("Child must be Some");
-            score.flip_players();
             current.score += score;
         }
     }
