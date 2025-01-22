@@ -226,7 +226,7 @@ where
         }
     }
 
-    pub fn backpropagation(&mut self, node_index: usize, count: Count) {
+    fn backpropagation(&mut self, node_index: usize, count: Count) {
         let mut current = Some(node_index);
         while let Some(node_index) = current {
             let node = &mut self.nodes[node_index];
