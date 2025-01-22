@@ -2,7 +2,7 @@
 /// either victory for one player (and defeat for the other) or a draw.
 pub trait TwoPlayerGame: Clone {
     /// A possible action to take in the game.
-    type Move: Clone + PartialEq + Eq;
+    type Move: Copy + Eq;
 
     /// Current state of the game yields terminal state or valid moves.
     ///
