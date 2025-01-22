@@ -12,7 +12,7 @@ fn play_move_connect_four() {
 
     let tree = Tree::with_playouts(game, num_playouts, &mut rng);
 
-    for (child, move_) in &tree.children {
+    for (child, move_) in &tree.nodes[0].children {
         eprintln!(
             "Score child {:?}: {:?} Reward: {:?}",
             move_,
@@ -37,7 +37,7 @@ fn start_from_terminal_position() {
             wins_player_two: 0,
             draws: 0
         },
-        tree.count
+        tree.nodes[0].count
     );
 }
 
@@ -53,7 +53,7 @@ fn play_against_perfect_solver_as_player_one() {
     while !game.is_over() {
         let next_move = if game.stones() % 2 == 0 {
             let num_playouts = 1_000;
-            let tree = Tree::with_playouts(ConnectFour(game), num_playouts, &mut rng);
+            let tree = Node::with_playouts(ConnectFour(game), num_playouts, &mut rng);
             tree.children
                 .iter()
                 .max_by(|(child_a, _), (child_b, _)| {
@@ -124,13 +124,49 @@ impl TwoPlayerGame for ConnectFour {
     }
 }
 
-#[derive(Debug)]
 pub struct Tree<G: TwoPlayerGame> {
+    nodes: Vec<Node<G>>,
+}
+
+impl<G> Tree<G> where G: TwoPlayerGame{
+    pub fn new(moves: impl Iterator<Item = G::Move>) -> Self {
+        let root = Node::new(moves);
+        Self { nodes: vec![root] }
+    }
+
+    pub fn with_playouts(game: G, num_playouts: u32, rng: &mut impl Rng) -> Self {
+        let mut moves_buf = Vec::new();
+        game.state(&mut moves_buf);
+        let mut tree = Self::new(moves_buf.iter().cloned());
+        for _ in 0..num_playouts {
+            tree.playout(game.clone(), rng);
+        }
+        tree
+    }
+
+    pub fn playout(&mut self, root_game: G, rng: &mut impl Rng) {
+        let mut game = root_game.clone();
+        let root = self.nodes.first_mut().unwrap();
+        let (mut path, selected) = root.select_leaf(&mut game);
+
+        let bias = if let Some((next_move, bias)) = selected.expand(game, rng) {
+            path.push(next_move);
+            bias
+        } else {
+            simulation(root_game, rng)
+        };
+
+        root.backpropagation(&path, bias);
+    }
+}
+
+#[derive(Debug)]
+pub struct Node<G: TwoPlayerGame> {
     count: Count,
     children: Vec<(Option<Self>, G::Move)>,
 }
 
-impl<G> Tree<G>
+impl<G> Node<G>
 where
     G: TwoPlayerGame,
 {
@@ -213,7 +249,7 @@ where
             let mut moves = Vec::new();
             game.state(&mut moves);
             let bias = simulation(game, rng);
-            *child = Some(Tree::new(moves.into_iter()));
+            *child = Some(Node::new(moves.into_iter()));
             Some((move_.clone(), bias))
         } else {
             // Selected child has been in a terminal state
