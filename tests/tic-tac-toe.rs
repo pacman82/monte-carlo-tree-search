@@ -82,6 +82,44 @@ fn report_win_if_initialized_with_terminal_position() {
     assert_eq!(EstimatedOutcome::WinPlayerOne, tree.estimate_outcome())
 }
 
+#[test]
+fn suggest_winning_move() {
+    let mut rng = StdRng::seed_from_u64(42);
+    // -------
+    // |X|O|O|
+    // |-----|
+    // |3|X|5|
+    // |-----|
+    // |X|7|O|
+    // -------
+    let mut game = TicTacToe::new();
+    game.play_move(&CellIndex::new(4));
+    game.play_move(&CellIndex::new(1));
+    game.play_move(&CellIndex::new(6));
+    game.play_move(&CellIndex::new(2));
+    game.play_move(&CellIndex::new(0));
+    game.play_move(&CellIndex::new(8));
+    // game.print_to(stderr()).unwrap();
+
+
+
+    let num_playouts = 1;
+    let tree = Tree::with_playouts(game, num_playouts, &mut rng);
+
+    assert_eq!(CellIndex::new(3), tree.best_move().unwrap())
+}
+
+/// With few or zero playouts, we can be in a situation, there not all nodes of the root are
+/// explored. We want to handle unexplored direct children of the root node, withouth panic.
+#[test]
+fn unexplored_root_childs() {
+    let game = TicTacToe::new();
+    
+    let tree = Tree::new(game);
+
+    assert!(tree.best_move().is_some())
+}
+
 /// Strict alias, so we can implement trait for type
 #[derive(Clone, Copy)]
 struct TicTacToe(tic_tac_toe_board::TicTacToe);

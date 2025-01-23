@@ -96,13 +96,17 @@ pub struct Count {
 
 impl Count {
     /// Assign a score of 1 for winning, 0 for loosing and 0.5 for a draw. Divided by the number of
-    /// playouts. Zero playouts will result in a score of 0.
+    /// playouts. Zero playouts will result in a score of 0.5.
     pub fn reward(&self, player: u8) -> f32 {
+        let total = self.total();
+        if self.total() == 0 {
+            return 0.5;
+        }
         if player == 0 {
-            (self.wins_player_one as f32 + self.draws as f32 * 0.5) / self.total() as f32
+            (self.wins_player_one as f32 + self.draws as f32 * 0.5) / total as f32
         } else {
             debug_assert!(player == 1);
-            (self.wins_player_two as f32 + self.draws as f32 * 0.5) / self.total() as f32
+            (self.wins_player_two as f32 + self.draws as f32 * 0.5) / total as f32
         }
     }
 

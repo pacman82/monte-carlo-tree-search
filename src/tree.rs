@@ -85,12 +85,19 @@ where
         let root = &self.nodes[0];
         self.links[root.children_begin..root.children_end]
             .iter()
-            .max_by(|a, b| {
-                let a = self.nodes[a.child].estimated_outcome.reward(current_player);
-                let b = self.nodes[b.child].estimated_outcome.reward(current_player);
-                a.partial_cmp(&b).unwrap()
+            .map(|link| {
+                let eo = if link.is_explored() {
+                    self.nodes[link.child].estimated_outcome.reward(current_player)
+                } else {
+                    // Use default constructed estimated outcome if node is not explored yet.
+                    EstimatedOutcome::default().reward(current_player)
+                };
+                (link.move_, eo)
             })
-            .map(|link| link.move_)
+            .max_by(|(_move_a, reward_a), (_move_b, reward_b)| {
+                reward_a.partial_cmp(reward_b).unwrap()
+            })
+            .map(|(move_, _reward)| move_)
     }
 
     /// Selects a leaf of the tree.
