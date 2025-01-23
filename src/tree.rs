@@ -1,6 +1,6 @@
 use rand::{seq::SliceRandom as _, Rng};
 
-use crate::{count::EstimatedOutcome, simulation, TwoPlayerGame};
+use crate::{count::EstimatedOutcome, simulation, Count, GameState, TwoPlayerGame};
 
 pub struct Tree<G: TwoPlayerGame> {
     /// Game state of the root node.
@@ -12,6 +12,9 @@ pub struct Tree<G: TwoPlayerGame> {
     /// vector. Each node will have a range in this vector indicated by a start and end index. We
     /// use usize::Max to indicate, that the node is not expanded yet.
     links: Vec<Link<G::Move>>,
+    /// A buffer we use to store moves during node expansion. We have this as a member to avoid
+    /// repeated allocation.
+    move_buf: Vec<G::Move>,
 }
 
 impl<G> Tree<G>
@@ -19,18 +22,27 @@ where
     G: TwoPlayerGame,
 {
     pub fn new(game: G) -> Self {
-        let mut moves = Vec::new();
-        game.state(&mut moves);
-        let root = Node::new(usize::MAX, 0, moves.len());
+        let mut move_buf = Vec::new();
+        let estimated_outcome = match game.state(&mut move_buf) {
+            GameState::Moves(_) | GameState::Draw => EstimatedOutcome::Undecided(Count::default()),
+            GameState::WinPlayerOne => EstimatedOutcome::WinPlayerOne,
+            GameState::WinPlayerTwo => EstimatedOutcome::WinPlayerTwo,
+        };
+        let root = Node::new(usize::MAX, 0, move_buf.len(), estimated_outcome);
         let nodes = vec![root];
-        let links = moves
-            .into_iter()
+        let links = move_buf
+            .drain(..)
             .map(|move_| Link {
                 child: usize::MAX,
                 move_,
             })
             .collect();
-        Self { game, nodes, links }
+        Self {
+            game,
+            nodes,
+            links,
+            move_buf,
+        }
     }
 
     pub fn with_playouts(game: G, num_playouts: u32, rng: &mut impl Rng) -> Self {
@@ -45,13 +57,13 @@ where
     pub fn playout(&mut self, rng: &mut impl Rng) {
         let (leaf_index, mut game) = self.select_leaf();
         let expanded_index = self.expand(leaf_index, &mut game, rng);
-        let count = simulation(game, rng);
+        let count = simulation(game, &mut self.move_buf, rng);
         self.backpropagation(expanded_index, count);
     }
 
     /// Count of playouts of the root node.
     pub fn estimate_outcome(&self) -> EstimatedOutcome {
-        self.nodes[0].count
+        self.nodes[0].estimated_outcome
     }
 
     pub fn estimated_outcome_by_move(
@@ -62,7 +74,7 @@ where
             .iter()
             .map(move |link| {
                 let child = &self.nodes[link.child];
-                (link.move_, child.count)
+                (link.move_, child.estimated_outcome)
             })
     }
 
@@ -74,8 +86,8 @@ where
         self.links[root.children_begin..root.children_end]
             .iter()
             .max_by(|a, b| {
-                let a = self.nodes[a.child].count.reward(current_player);
-                let b = self.nodes[b.child].count.reward(current_player);
+                let a = self.nodes[a.child].estimated_outcome.reward(current_player);
+                let b = self.nodes[b.child].estimated_outcome.reward(current_player);
                 a.partial_cmp(&b).unwrap()
             })
             .map(|link| link.move_)
@@ -93,12 +105,12 @@ where
             let best_ucb = self
                 .children(current_node_index)
                 .max_by(|a, b| {
-                    let a = self.nodes[a.child].count.selection_weight(
-                        self.nodes[current_node_index].count.total() as f32,
+                    let a = self.nodes[a.child].estimated_outcome.selection_weight(
+                        self.nodes[current_node_index].estimated_outcome.total() as f32,
                         game.current_player(),
                     );
-                    let b = self.nodes[b.child].count.selection_weight(
-                        self.nodes[current_node_index].count.total() as f32,
+                    let b = self.nodes[b.child].estimated_outcome.selection_weight(
+                        self.nodes[current_node_index].estimated_outcome.total() as f32,
                         game.current_player(),
                     );
                     a.partial_cmp(&b).unwrap()
@@ -124,20 +136,21 @@ where
             .collect();
         if let Some(link) = candidates.choose_mut(rng) {
             game.play(&link.move_);
-            let mut moves = Vec::new();
-            game.state(&mut moves);
+            game.state(&mut self.move_buf);
 
-            link.child = self.nodes.len();
+            let new_node_index = self.nodes.len();
+            link.child = new_node_index;
             self.nodes.push(Node::new(
                 selected_node_index,
                 self.links.len(),
-                self.links.len() + moves.len(),
+                self.links.len() + self.move_buf.len(),
+                EstimatedOutcome::default(),
             ));
-            self.links.extend(moves.into_iter().map(|move_| Link {
+            self.links.extend(self.move_buf.drain(..).map(|move_| Link {
                 child: usize::MAX,
                 move_,
             }));
-            self.nodes.len() - 1
+            new_node_index
         } else {
             // Selected child has no unexplored children => since it is a leaf, it must be in a
             // terminal state
@@ -149,7 +162,7 @@ where
         let mut current = Some(node_index);
         while let Some(node_index) = current {
             let node = &mut self.nodes[node_index];
-            node.count.propagate_child(count);
+            node.estimated_outcome.propagate_child(count);
             current = node.parent_index();
         }
     }
@@ -182,16 +195,16 @@ struct Node {
     /// of the next node would start, i.e. `children_begin + num_children`. `0` if the node does not
     /// have children.
     children_end: usize,
-    count: EstimatedOutcome,
+    estimated_outcome: EstimatedOutcome,
 }
 
 impl Node {
-    fn new(parent: usize, children_begin: usize, children_end: usize) -> Self {
+    fn new(parent: usize, children_begin: usize, children_end: usize, estimated_outcome: EstimatedOutcome) -> Self {
         Self {
             parent,
             children_begin,
             children_end,
-            count: EstimatedOutcome::default(),
+            estimated_outcome,
         }
     }
 

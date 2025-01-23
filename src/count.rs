@@ -2,6 +2,8 @@ use std::ops::AddAssign;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EstimatedOutcome {
+    WinPlayerOne,
+    WinPlayerTwo,
     /// The outcome could not be proven to be either a win, loss or draw.
     Undecided(Count),
 }
@@ -14,21 +16,51 @@ impl EstimatedOutcome {
     /// tree search has been completed.
     pub fn reward(&self, player: u8) -> f32 {
         match self {
-            Self::Undecided(count) => count.reward(player),
+            EstimatedOutcome::Undecided(count) => count.reward(player),
+            EstimatedOutcome::WinPlayerOne => {
+                if player == 0 {
+                    1.0
+                } else {
+                    0.0
+                }
+            }
+            EstimatedOutcome::WinPlayerTwo => {
+                if player == 0 {
+                    0.0
+                } else {
+                    1.0
+                }
+            }
         }
     }
 
     /// A weight used to decide how much we want to explore this node.
     pub(crate) fn selection_weight(&self, total_visits_parent: f32, player: u8) -> f32 {
         match self {
-            Self::Undecided(count) => count.ucb(total_visits_parent, player),
+            EstimatedOutcome::Undecided(count) => count.ucb(total_visits_parent, player),
+            EstimatedOutcome::WinPlayerOne => {
+                if player == 0 {
+                    f32::MAX
+                } else {
+                    0.0
+                }
+            }
+            EstimatedOutcome::WinPlayerTwo => {
+                if player == 0 {
+                    0.0
+                } else {
+                    f32::MAX
+                }
+            }
         }
     }
 
     /// Count of total playouts
     pub(crate) fn total(&self) -> u32 {
         match self {
-            Self::Undecided(count) => count.total(),
+            EstimatedOutcome::Undecided(count) => count.total(),
+            EstimatedOutcome::WinPlayerOne => 1,
+            EstimatedOutcome::WinPlayerTwo => 1,
         }
     }
 
@@ -36,6 +68,13 @@ impl EstimatedOutcome {
         match (self, child) {
             (EstimatedOutcome::Undecided(a), EstimatedOutcome::Undecided(b)) => {
                 *a += b;
+            }
+            (EstimatedOutcome::WinPlayerOne, _) | (EstimatedOutcome::WinPlayerTwo, _) => (),
+            (EstimatedOutcome::Undecided(count), EstimatedOutcome::WinPlayerOne) => {
+                count.wins_player_one += 1;
+            }
+            (EstimatedOutcome::Undecided(count), EstimatedOutcome::WinPlayerTwo) => {
+                count.wins_player_two += 1;
             }
         }
     }

@@ -1,6 +1,6 @@
 use std::ops::{Deref, DerefMut};
 
-use monte_carlo_tree_search::{GameState, Tree, TwoPlayerGame};
+use monte_carlo_tree_search::{EstimatedOutcome, GameState, Tree, TwoPlayerGame};
 use rand::{rngs::StdRng, SeedableRng as _};
 use tic_tac_toe_board::{CellIndex, TicTacToeState};
 
@@ -52,6 +52,34 @@ fn prevent_immediate_win_of_other_player() {
         );
     }
     assert_eq!(CellIndex::new(7), tree.best_move().unwrap());
+}
+
+#[test]
+fn report_win_if_initialized_with_terminal_position() {
+    let mut rng = StdRng::seed_from_u64(42);
+    // -------
+    // |X|O|O|
+    // |-----|
+    // |O|X| |
+    // |-----|
+    // |X| |X|
+    // -------
+    let mut game = TicTacToe::new();
+    game.play_move(&CellIndex::new(4));
+    game.play_move(&CellIndex::new(1));
+    game.play_move(&CellIndex::new(6));
+    game.play_move(&CellIndex::new(2));
+    game.play_move(&CellIndex::new(0));
+    game.play_move(&CellIndex::new(3));
+    game.play_move(&CellIndex::new(8));
+    // game.print_to(stderr()).unwrap();
+
+
+
+    let num_playouts = 1;
+    let tree = Tree::with_playouts(game, num_playouts, &mut rng);
+
+    assert_eq!(EstimatedOutcome::WinPlayerOne, tree.estimate_outcome())
 }
 
 /// Strict alias, so we can implement trait for type

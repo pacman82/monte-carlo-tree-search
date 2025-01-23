@@ -1,7 +1,7 @@
 use std::fmt::{self, Display};
 
 use connect_four_solver::{Column, Solver};
-use monte_carlo_tree_search::{Count, EstimatedOutcome, GameState, Tree, TwoPlayerGame};
+use monte_carlo_tree_search::{EstimatedOutcome, GameState, Tree, TwoPlayerGame};
 use rand::{rngs::StdRng, seq::SliceRandom, SeedableRng};
 
 #[test]
@@ -24,19 +24,12 @@ fn play_move_connect_four() {
 
 #[test]
 fn start_from_terminal_position() {
-    let mut rng = StdRng::seed_from_u64(42);
-
     // First player has won
     let game = ConnectFour::from_move_list("1212121");
-    let num_playouts = 5;
-    let tree = Tree::with_playouts(game, num_playouts, &mut rng);
+    let tree = Tree::new(game);
 
     assert_eq!(
-        EstimatedOutcome::Undecided(Count {
-            wins_player_one: 5,
-            wins_player_two: 0,
-            draws: 0
-        }),
+        EstimatedOutcome::WinPlayerOne,
         tree.estimate_outcome()
     );
 }
