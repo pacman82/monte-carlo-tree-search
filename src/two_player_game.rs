@@ -24,6 +24,7 @@ pub trait TwoPlayerGame: Clone {
 }
 
 /// Possible states defining a game
+#[derive(Debug, PartialEq, Eq)]
 pub enum GameState<'a, Move> {
     /// Complete list of all legal moves for the current player
     Moves(&'a [Move]),

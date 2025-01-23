@@ -43,6 +43,7 @@ version = "0.1.0"
 dependencies = [
  "connect-four-solver",
  "rand",
+ "tic-tac-toe-board",
 ]
 
 [[package]]
@@ -112,6 +113,12 @@ dependencies = [
  "quote",
  "unicode-ident",
 ]
+
+[[package]]
+name = "tic-tac-toe-board"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6e8fdafd23fff8485cc19f7634aa753dcbf833f10015b46e800a0cee1023b196"
 
 [[package]]
 name = "unicode-ident"

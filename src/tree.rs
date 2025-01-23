@@ -23,10 +23,13 @@ where
         game.state(&mut moves);
         let root = Node::new(usize::MAX, 0, moves.len());
         let nodes = vec![root];
-        let links = moves.into_iter().map(|move_| Link {
-            child: usize::MAX,
-            move_,
-        }).collect();
+        let links = moves
+            .into_iter()
+            .map(|move_| Link {
+                child: usize::MAX,
+                move_,
+            })
+            .collect();
         Self { game, nodes, links }
     }
 
@@ -93,7 +96,11 @@ where
             game.state(&mut moves);
 
             link.child = self.nodes.len();
-            self.nodes.push(Node::new(selected_node_index, self.links.len(), self.links.len() + moves.len()));
+            self.nodes.push(Node::new(
+                selected_node_index,
+                self.links.len(),
+                self.links.len() + moves.len(),
+            ));
             self.links.extend(moves.into_iter().map(|move_| Link {
                 child: usize::MAX,
                 move_,
@@ -130,6 +137,21 @@ where
             })
     }
 
+    /// Picks a move with the highest reward for the current player. `None` if the root node has no
+    /// children.
+    pub fn best_move(&self) -> Option<G::Move> {
+        let current_player = self.game.current_player();
+        let root = &self.nodes[0];
+        self.links[root.children_begin..root.children_end]
+            .iter()
+            .max_by(|a, b| {
+                let a = self.nodes[a.child].count.reward(current_player);
+                let b = self.nodes[b.child].count.reward(current_player);
+                a.partial_cmp(&b).unwrap()
+            })
+            .map(|link| link.move_)
+    }
+
     /// A leaf is any node with no children or unexplored children
     fn is_leaf(&self, node_index: usize) -> bool {
         let mut it = self.children(node_index);
@@ -161,8 +183,7 @@ struct Node {
     count: Count,
 }
 
-impl Node
-{
+impl Node {
     fn new(parent: usize, children_begin: usize, children_end: usize) -> Self {
         Self {
             parent,
