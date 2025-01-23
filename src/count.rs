@@ -1,5 +1,52 @@
 use std::ops::AddAssign;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EstimatedOutcome {
+    /// The outcome could not be proven to be either a win, loss or draw.
+    Undecided(Count),
+}
+
+impl EstimatedOutcome {
+    /// A value between 0 and 1 indicating, how rewarding this outcome is for the given player. 0
+    /// indicates a loss, 1 a win and 0.5 a draw. However 0.5 could also indicate an outcome which
+    /// is very undecided and poses and advantage for neither player. The reward function does
+    /// **not** include a term to encourge exploration. It is best used to choose a move after the
+    /// tree search has been completed.
+    pub fn reward(&self, player: u8) -> f32 {
+        match self {
+            Self::Undecided(count) => count.reward(player),
+        }
+    }
+
+    /// A weight used to decide how much we want to explore this node.
+    pub(crate) fn selection_weight(&self, total_visits_parent: f32, player: u8) -> f32 {
+        match self {
+            Self::Undecided(count) => count.ucb(total_visits_parent, player),
+        }
+    }
+
+    /// Count of total playouts
+    pub(crate) fn total(&self) -> u32 {
+        match self {
+            Self::Undecided(count) => count.total(),
+        }
+    }
+
+    pub(crate) fn propagate_child(&mut self, child: EstimatedOutcome) {
+        match (self, child) {
+            (EstimatedOutcome::Undecided(a), EstimatedOutcome::Undecided(b)) => {
+                *a += b;
+            }
+        }
+    }
+}
+
+impl Default for EstimatedOutcome {
+    fn default() -> Self {
+        Self::Undecided(Count::default())
+    }
+}
+
 /// Counts accumulated wins, losses and draws for this part of the tree
 #[derive(Default, Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Count {

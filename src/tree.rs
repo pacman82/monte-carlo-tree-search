@@ -1,6 +1,6 @@
 use rand::{seq::SliceRandom as _, Rng};
 
-use crate::{simulation, Count, TwoPlayerGame};
+use crate::{count::EstimatedOutcome, simulation, TwoPlayerGame};
 
 pub struct Tree<G: TwoPlayerGame> {
     /// Game state of the root node.
@@ -49,6 +49,38 @@ where
         self.backpropagation(expanded_index, count);
     }
 
+    /// Count of playouts of the root node.
+    pub fn estimate_outcome(&self) -> EstimatedOutcome {
+        self.nodes[0].count
+    }
+
+    pub fn estimated_outcome_by_move(
+        &self,
+    ) -> impl Iterator<Item = (G::Move, EstimatedOutcome)> + '_ {
+        let root = &self.nodes[0];
+        self.links[root.children_begin..root.children_end]
+            .iter()
+            .map(move |link| {
+                let child = &self.nodes[link.child];
+                (link.move_, child.count)
+            })
+    }
+
+    /// Picks a move with the highest reward for the current player. `None` if the root node has no
+    /// children.
+    pub fn best_move(&self) -> Option<G::Move> {
+        let current_player = self.game.current_player();
+        let root = &self.nodes[0];
+        self.links[root.children_begin..root.children_end]
+            .iter()
+            .max_by(|a, b| {
+                let a = self.nodes[a.child].count.reward(current_player);
+                let b = self.nodes[b.child].count.reward(current_player);
+                a.partial_cmp(&b).unwrap()
+            })
+            .map(|link| link.move_)
+    }
+
     /// Selects a leaf of the tree.
     ///
     /// # Return
@@ -61,11 +93,11 @@ where
             let best_ucb = self
                 .children(current_node_index)
                 .max_by(|a, b| {
-                    let a = self.nodes[a.child].count.ucb(
+                    let a = self.nodes[a.child].count.selection_weight(
                         self.nodes[current_node_index].count.total() as f32,
                         game.current_player(),
                     );
-                    let b = self.nodes[b.child].count.ucb(
+                    let b = self.nodes[b.child].count.selection_weight(
                         self.nodes[current_node_index].count.total() as f32,
                         game.current_player(),
                     );
@@ -113,43 +145,13 @@ where
         }
     }
 
-    fn backpropagation(&mut self, node_index: usize, count: Count) {
+    fn backpropagation(&mut self, node_index: usize, count: EstimatedOutcome) {
         let mut current = Some(node_index);
         while let Some(node_index) = current {
             let node = &mut self.nodes[node_index];
-            node.count += count;
+            node.count.propagate_child(count);
             current = node.parent_index();
         }
-    }
-
-    /// Count of playouts of the root node.
-    pub fn count(&self) -> Count {
-        self.nodes[0].count
-    }
-
-    pub fn counts_by_move(&self) -> impl Iterator<Item = (G::Move, Count)> + '_ {
-        let root = &self.nodes[0];
-        self.links[root.children_begin..root.children_end]
-            .iter()
-            .map(move |link| {
-                let child = &self.nodes[link.child];
-                (link.move_, child.count)
-            })
-    }
-
-    /// Picks a move with the highest reward for the current player. `None` if the root node has no
-    /// children.
-    pub fn best_move(&self) -> Option<G::Move> {
-        let current_player = self.game.current_player();
-        let root = &self.nodes[0];
-        self.links[root.children_begin..root.children_end]
-            .iter()
-            .max_by(|a, b| {
-                let a = self.nodes[a.child].count.reward(current_player);
-                let b = self.nodes[b.child].count.reward(current_player);
-                a.partial_cmp(&b).unwrap()
-            })
-            .map(|link| link.move_)
     }
 
     /// A leaf is any node with no children or unexplored children
@@ -180,7 +182,7 @@ struct Node {
     /// of the next node would start, i.e. `children_begin + num_children`. `0` if the node does not
     /// have children.
     children_end: usize,
-    count: Count,
+    count: EstimatedOutcome,
 }
 
 impl Node {
@@ -189,7 +191,7 @@ impl Node {
             parent,
             children_begin,
             children_end,
-            count: Count::default(),
+            count: EstimatedOutcome::default(),
         }
     }
 

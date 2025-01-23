@@ -1,12 +1,12 @@
 use rand::{seq::SliceRandom as _, Rng};
 
-use crate::{Count, GameState, TwoPlayerGame};
+use crate::{count::EstimatedOutcome, Count, GameState, TwoPlayerGame};
 
 /// Play random moves, until the game is over and report the score from the perspective of the
 /// player whose turn it is.
-pub fn simulation(mut game: impl TwoPlayerGame, rng: &mut impl Rng) -> Count {
+pub fn simulation(mut game: impl TwoPlayerGame, rng: &mut impl Rng) -> EstimatedOutcome {
     let mut moves_buf = Vec::new();
-    loop {
+    let count = loop {
         match game.state(&mut moves_buf) {
             GameState::Moves(legal_moves) => {
                 let selected_move = legal_moves.choose(rng).unwrap();
@@ -34,5 +34,6 @@ pub fn simulation(mut game: impl TwoPlayerGame, rng: &mut impl Rng) -> Count {
                 }
             }
         }
-    }
+    };
+    EstimatedOutcome::Undecided(count)
 }

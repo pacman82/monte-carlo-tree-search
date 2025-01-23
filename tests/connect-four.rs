@@ -1,7 +1,7 @@
 use std::fmt::{self, Display};
 
 use connect_four_solver::{Column, Solver};
-use monte_carlo_tree_search::{Count, GameState, Tree, TwoPlayerGame};
+use monte_carlo_tree_search::{Count, EstimatedOutcome, GameState, Tree, TwoPlayerGame};
 use rand::{rngs::StdRng, seq::SliceRandom, SeedableRng};
 
 #[test]
@@ -12,7 +12,7 @@ fn play_move_connect_four() {
 
     let tree = Tree::with_playouts(game, num_playouts, &mut rng);
 
-    for (move_, score) in tree.counts_by_move() {
+    for (move_, score) in tree.estimated_outcome_by_move() {
         eprintln!(
             "Score child {:?}: {:?} Reward: {:?}",
             move_,
@@ -32,12 +32,12 @@ fn start_from_terminal_position() {
     let tree = Tree::with_playouts(game, num_playouts, &mut rng);
 
     assert_eq!(
-        Count {
+        EstimatedOutcome::Undecided(Count {
             wins_player_one: 5,
             wins_player_two: 0,
             draws: 0
-        },
-        tree.count()
+        }),
+        tree.estimate_outcome()
     );
 }
 
@@ -54,7 +54,7 @@ fn play_against_perfect_solver_as_player_one() {
         let next_move = if game.stones() % 2 == 0 {
             let num_playouts = 1_000;
             let tree = Tree::with_playouts(ConnectFour(game), num_playouts, &mut rng);
-            tree.counts_by_move()
+            tree.estimated_outcome_by_move()
                 .max_by(|(_, score_a), (_, score_b)| {
                     let a = score_a.reward(0);
                     let b = score_b.reward(0);

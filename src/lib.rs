@@ -6,7 +6,7 @@ mod two_player_game;
 use self::simulation::simulation;
 
 pub use self::{
-    count::Count,
+    count::{Count, EstimatedOutcome},
+    tree::Tree,
     two_player_game::{GameState, TwoPlayerGame},
-    tree::Tree
 };

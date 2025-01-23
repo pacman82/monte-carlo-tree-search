@@ -42,9 +42,14 @@ fn prevent_immediate_win_of_other_player() {
 
     let num_playouts = 100;
     let tree = Tree::with_playouts(game, num_playouts, &mut rng);
-    let counts = tree.counts_by_move().collect::<Vec<_>>();
+    let counts = tree.estimated_outcome_by_move().collect::<Vec<_>>();
     for (mv, count) in counts {
-        eprintln!("Move: {:?} Count: {:?}, Reward: {}", mv, count, count.reward(0));
+        eprintln!(
+            "Move: {:?} Count: {:?}, Reward: {}",
+            mv,
+            count,
+            count.reward(0)
+        );
     }
     assert_eq!(CellIndex::new(7), tree.best_move().unwrap());
 }
