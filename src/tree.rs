@@ -95,7 +95,7 @@ where
                 (link.move_, eo)
             })
             .max_by(|(_move_a, reward_a), (_move_b, reward_b)| {
-                reward_a.partial_cmp(reward_b).unwrap()
+                reward_a.partial_cmp(reward_b).expect("Reward must be comparable")
             })
             .map(|(move_, _reward)| move_)
     }
