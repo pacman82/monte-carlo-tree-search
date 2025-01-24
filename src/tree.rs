@@ -54,7 +54,7 @@ where
 
     /// Playout one cycle of selection, expansion, simulation and backpropagation.
     pub fn playout(&mut self, rng: &mut impl Rng) {
-        let (leaf_index, mut game) = self.select_leaf();
+        let (leaf_index, mut game) = self.select_leaf_for_exploration();
         // expanded_index might be leaf_index, usually it will be a new child node though, in case
         // leaf is not a terminal state
         let expanded_index = self.expand(leaf_index, &mut game, rng);
@@ -106,12 +106,21 @@ where
             .map(|(move_, _reward)| move_)
     }
 
-    /// Selects a leaf of the tree.
+    pub fn num_nodes(&self) -> usize {
+        self.nodes.len()
+    }
+    
+    pub fn num_links(&self) -> usize {
+        self.links.len()
+    }
+
+    /// Selects a leaf of the tree for exploration. The selected leaf is not solved yet. I.e. we
+    /// do not know the outcome of the game from the leaf or any of its parents given perfect play.
     ///
     /// # Return
     ///
-    /// Index of a leaf and the game state it represents.
-    fn select_leaf(&self) -> (usize, G) {
+    /// Index of the selected leaf node and the game state of the node.
+    fn select_leaf_for_exploration(&self) -> (usize, G) {
         let mut current_node_index = 0;
         let mut game = self.game.clone();
         while !self.is_leaf(current_node_index) {

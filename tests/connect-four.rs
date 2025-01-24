@@ -47,6 +47,7 @@ fn play_against_perfect_solver_as_player_one() {
         let next_move = if game.stones() % 2 == 0 {
             let num_playouts = 1_000;
             let tree = Tree::with_playouts(ConnectFour(game), num_playouts, &mut rng);
+            eprintln!("nodes: {} links: {}", tree.num_nodes(), tree.num_links());
             tree.estimated_outcome_by_move()
                 .max_by(|(_, score_a), (_, score_b)| {
                     let a = score_a.reward(0);
