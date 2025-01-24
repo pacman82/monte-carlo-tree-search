@@ -1,4 +1,4 @@
-use monte_carlo_tree_search::{EstimatedOutcome, GameState, Tree, TwoPlayerGame};
+use monte_carlo_tree_search::{Evaluation, GameState, Tree, TwoPlayerGame};
 
 #[test]
 fn player_one_always_wins() {
@@ -25,5 +25,5 @@ fn player_one_always_wins() {
 
     let tree = Tree::new(game);
 
-    assert_eq!(EstimatedOutcome::WinPlayerOne, tree.estimate_outcome());
+    assert_eq!(Evaluation::WinPlayerOne, tree.estimate_outcome());
 }

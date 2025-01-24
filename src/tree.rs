@@ -1,6 +1,6 @@
 use rand::{seq::SliceRandom as _, Rng};
 
-use crate::{count::EstimatedOutcome, simulation, TwoPlayerGame};
+use crate::{count::Evaluation, simulation, TwoPlayerGame};
 
 pub struct Tree<G: TwoPlayerGame> {
     /// Game state of the root node.
@@ -62,25 +62,25 @@ where
         let player = game.current_player();
         self.backpropagation(
             expanded_index,
-            self.nodes[expanded_index].estimated_outcome,
+            self.nodes[expanded_index].evaluation,
             player,
         );
     }
 
     /// Count of playouts of the root node.
-    pub fn estimate_outcome(&self) -> EstimatedOutcome {
-        self.nodes[0].estimated_outcome
+    pub fn estimate_outcome(&self) -> Evaluation {
+        self.nodes[0].evaluation
     }
 
     pub fn estimated_outcome_by_move(
         &self,
-    ) -> impl Iterator<Item = (G::Move, EstimatedOutcome)> + '_ {
+    ) -> impl Iterator<Item = (G::Move, Evaluation)> + '_ {
         let root = &self.nodes[0];
         self.links[root.children_begin..root.children_end]
             .iter()
             .map(move |link| {
                 let child = &self.nodes[link.child];
-                (link.move_, child.estimated_outcome)
+                (link.move_, child.evaluation)
             })
     }
 
@@ -94,11 +94,11 @@ where
             .map(|link| {
                 let eo = if link.is_explored() {
                     self.nodes[link.child]
-                        .estimated_outcome
+                        .evaluation
                         .reward(current_player)
                 } else {
                     // Use default constructed estimated outcome if node is not explored yet.
-                    EstimatedOutcome::default().reward(current_player)
+                    Evaluation::default().reward(current_player)
                 };
                 (link.move_, eo)
             })
@@ -131,12 +131,12 @@ where
             let best_ucb = self
                 .children(current_node_index)
                 .max_by(|a, b| {
-                    let a = self.nodes[a.child].estimated_outcome.selection_weight(
-                        self.nodes[current_node_index].estimated_outcome.total() as f32,
+                    let a = self.nodes[a.child].evaluation.selection_weight(
+                        self.nodes[current_node_index].evaluation.total() as f32,
                         game.current_player(),
                     );
-                    let b = self.nodes[b.child].estimated_outcome.selection_weight(
-                        self.nodes[current_node_index].estimated_outcome.total() as f32,
+                    let b = self.nodes[b.child].evaluation.selection_weight(
+                        self.nodes[current_node_index].evaluation.total() as f32,
                         game.current_player(),
                     );
                     a.partial_cmp(&b).unwrap()
@@ -177,7 +177,7 @@ where
             let estimated_outcome = maybe_solved_outcome
                 // **Be careful**: move_buf will be cleared by simulation, so we should have used
                 // all relevant information from it before calling simulation.
-                .unwrap_or(EstimatedOutcome::Undecided(simulation(
+                .unwrap_or(Evaluation::Undecided(simulation(
                     game.clone(),
                     &mut self.move_buf,
                     rng,
@@ -197,43 +197,47 @@ where
         }
     }
 
-    fn backpropagation(&mut self, node_index: usize, count: EstimatedOutcome, mut player: u8) {
-        let mut node = &mut self.nodes[node_index];
-        let mut current = node.parent_index();
+    fn backpropagation(&mut self, node_index: usize, count: Evaluation, mut player: u8) {
+        let mut current = self.nodes[node_index].parent_index();
         while let Some(node_index) = current {
             // 0 -> 1, 1 -> 0
             player = (player + 1) % 2;
-            node = &mut self.nodes[node_index];
-            Self::update_parent(&mut node.estimated_outcome, count, player);
+
+            let updated_outcome = self.updated_evaluation(node_index, count, player);
+            let node = &mut self.nodes[node_index];
+            node.evaluation = updated_outcome;
             current = node.parent_index();
         }
     }
 
-    fn update_parent(
-        parent_outcome: &mut EstimatedOutcome,
-        propagated_outcome: EstimatedOutcome,
-        player: u8,
-    ) {
+    fn updated_evaluation(
+        &self,
+        node_index: usize,
+        propagated_outcome: Evaluation,
+        choosing_player: u8,
+    ) -> Evaluation{
+        let old_evaluation = self.nodes[node_index].evaluation;
         // If it is player ones turn (she can pick the child) she will choose a win
-        if player == 0 && propagated_outcome == EstimatedOutcome::WinPlayerOne {
-            *parent_outcome = EstimatedOutcome::WinPlayerOne;
-            return;
+        if choosing_player == 0 && propagated_outcome == Evaluation::WinPlayerOne {
+            return Evaluation::WinPlayerOne;
         }
-        if player == 1 && propagated_outcome == EstimatedOutcome::WinPlayerTwo {
-            *parent_outcome = EstimatedOutcome::WinPlayerTwo;
-            return;
+        if choosing_player == 1 && propagated_outcome == Evaluation::WinPlayerTwo {
+            return Evaluation::WinPlayerTwo;
         }
-        match (parent_outcome, propagated_outcome) {
-            (EstimatedOutcome::Undecided(a), EstimatedOutcome::Undecided(b)) => {
-                *a += b;
+        match (old_evaluation, propagated_outcome) {
+            (Evaluation::Undecided(mut a), Evaluation::Undecided(b)) => {
+                a += b;
+                Evaluation::Undecided(a)
             }
-            (EstimatedOutcome::Undecided(count), EstimatedOutcome::WinPlayerOne) => {
+            (Evaluation::Undecided(mut count), Evaluation::WinPlayerOne) => {
                 count.wins_player_one += 1;
+                Evaluation::Undecided(count)
             }
-            (EstimatedOutcome::Undecided(count), EstimatedOutcome::WinPlayerTwo) => {
+            (Evaluation::Undecided(mut count), Evaluation::WinPlayerTwo) => {
                 count.wins_player_two += 1;
+                Evaluation::Undecided(count)
             }
-            _ => (),
+            _ => old_evaluation,
         }
     }
 
@@ -265,7 +269,7 @@ struct Node {
     /// of the next node would start, i.e. `children_begin + num_children`. `0` if the node does not
     /// have children.
     children_end: usize,
-    estimated_outcome: EstimatedOutcome,
+    evaluation: Evaluation,
 }
 
 impl Node {
@@ -273,13 +277,13 @@ impl Node {
         parent: usize,
         children_begin: usize,
         children_end: usize,
-        estimated_outcome: EstimatedOutcome,
+        estimated_outcome: Evaluation,
     ) -> Self {
         Self {
             parent,
             children_begin,
             children_end,
-            estimated_outcome,
+            evaluation: estimated_outcome,
         }
     }
 

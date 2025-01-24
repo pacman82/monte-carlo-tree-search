@@ -1,7 +1,7 @@
 use std::fmt::{self, Display};
 
 use connect_four_solver::{Column, Solver};
-use monte_carlo_tree_search::{EstimatedOutcome, GameState, Tree, TwoPlayerGame};
+use monte_carlo_tree_search::{Evaluation, GameState, Tree, TwoPlayerGame};
 use rand::{rngs::StdRng, seq::SliceRandom, SeedableRng};
 
 #[test]
@@ -29,7 +29,7 @@ fn start_from_terminal_position() {
     let tree = Tree::new(game);
 
     assert_eq!(
-        EstimatedOutcome::WinPlayerOne,
+        Evaluation::WinPlayerOne,
         tree.estimate_outcome()
     );
 }

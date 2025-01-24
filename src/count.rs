@@ -1,14 +1,14 @@
 use std::ops::AddAssign;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum EstimatedOutcome {
+pub enum Evaluation {
     WinPlayerOne,
     WinPlayerTwo,
     /// The outcome could not be proven to be either a win, loss or draw.
     Undecided(Count),
 }
 
-impl EstimatedOutcome {
+impl Evaluation {
 
     /// A value between 0 and 1 indicating, how rewarding this outcome is for the given player. 0
     /// indicates a loss, 1 a win and 0.5 a draw. However 0.5 could also indicate an outcome which
@@ -17,15 +17,15 @@ impl EstimatedOutcome {
     /// tree search has been completed.
     pub fn reward(&self, player: u8) -> f32 {
         match self {
-            EstimatedOutcome::Undecided(count) => count.reward(player),
-            EstimatedOutcome::WinPlayerOne => {
+            Evaluation::Undecided(count) => count.reward(player),
+            Evaluation::WinPlayerOne => {
                 if player == 0 {
                     1.0
                 } else {
                     0.0
                 }
             }
-            EstimatedOutcome::WinPlayerTwo => {
+            Evaluation::WinPlayerTwo => {
                 if player == 0 {
                     0.0
                 } else {
@@ -38,15 +38,15 @@ impl EstimatedOutcome {
     /// A weight used to decide how much we want to explore this node.
     pub(crate) fn selection_weight(&self, total_visits_parent: f32, player: u8) -> f32 {
         match self {
-            EstimatedOutcome::Undecided(count) => count.ucb(total_visits_parent, player),
-            EstimatedOutcome::WinPlayerOne => {
+            Evaluation::Undecided(count) => count.ucb(total_visits_parent, player),
+            Evaluation::WinPlayerOne => {
                 if player == 0 {
                     f32::MAX
                 } else {
                     0.0
                 }
             }
-            EstimatedOutcome::WinPlayerTwo => {
+            Evaluation::WinPlayerTwo => {
                 if player == 0 {
                     0.0
                 } else {
@@ -59,14 +59,14 @@ impl EstimatedOutcome {
     /// Count of total playouts
     pub(crate) fn total(&self) -> u32 {
         match self {
-            EstimatedOutcome::Undecided(count) => count.total(),
-            EstimatedOutcome::WinPlayerOne => 1,
-            EstimatedOutcome::WinPlayerTwo => 1,
+            Evaluation::Undecided(count) => count.total(),
+            Evaluation::WinPlayerOne => 1,
+            Evaluation::WinPlayerTwo => 1,
         }
     }
 }
 
-impl Default for EstimatedOutcome {
+impl Default for Evaluation {
     fn default() -> Self {
         Self::Undecided(Count::default())
     }
