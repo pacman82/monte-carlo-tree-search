@@ -1,3 +1,5 @@
+use crate::{Count, EstimatedOutcome};
+
 /// Two Player games are games there two players alternate taking turns, until the game ends in
 /// either victory for one player (and defeat for the other) or a draw.
 pub trait TwoPlayerGame: Clone {
@@ -19,7 +21,8 @@ pub trait TwoPlayerGame: Clone {
 
     /// The player whose turn it currently is. `0` For player one who starts the game `1` for player
     /// two who makes the second move. If the board is in a terminal position, it should return the
-    /// player those turn it would be, i.e. the player which did not play the last move.
+    /// player those turn it would be, i.e. the player which did not play the last move. Currently
+    /// the trait requires turns to be alternating.
     fn current_player(&self) -> u8;
 }
 
@@ -31,4 +34,26 @@ pub enum GameState<'a, Move> {
     WinPlayerOne,
     WinPlayerTwo,
     Draw,
+}
+
+impl<M> GameState<'_, M> {
+    pub fn moves(&self) -> &[M] {
+        match self {
+            GameState::Moves(moves) => moves,
+            _ => &[],
+        }
+    }
+
+    pub (crate) fn map_to_estimated_outcome(&self) -> Option<EstimatedOutcome> {
+        match self {
+            GameState::Moves(_) => None,
+            GameState::Draw => Some(EstimatedOutcome::Undecided(Count {
+                draws: 1,
+                wins_player_one: 0,
+                wins_player_two: 0,
+            })),
+            GameState::WinPlayerOne => Some(EstimatedOutcome::WinPlayerOne),
+            GameState::WinPlayerTwo => Some(EstimatedOutcome::WinPlayerTwo),
+        }
+    }
 }

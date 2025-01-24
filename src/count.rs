@@ -9,6 +9,7 @@ pub enum EstimatedOutcome {
 }
 
 impl EstimatedOutcome {
+
     /// A value between 0 and 1 indicating, how rewarding this outcome is for the given player. 0
     /// indicates a loss, 1 a win and 0.5 a draw. However 0.5 could also indicate an outcome which
     /// is very undecided and poses and advantage for neither player. The reward function does
@@ -42,12 +43,12 @@ impl EstimatedOutcome {
                 if player == 0 {
                     f32::MAX
                 } else {
-                    0.0
+                    f32::EPSILON
                 }
             }
             EstimatedOutcome::WinPlayerTwo => {
                 if player == 0 {
-                    0.0
+                    f32::EPSILON
                 } else {
                     f32::MAX
                 }
@@ -64,18 +65,28 @@ impl EstimatedOutcome {
         }
     }
 
-    pub(crate) fn propagate_child(&mut self, child: EstimatedOutcome) {
+    pub(crate) fn propagate_outcome(&mut self, child: EstimatedOutcome, player: u8) {
+        // If it is player ones turn (she can pick the child) she will choose a win
+        if player == 0 && child == EstimatedOutcome::WinPlayerOne{
+            *self = EstimatedOutcome::WinPlayerOne;
+            return;
+        }
+        if player == 1 && child == EstimatedOutcome::WinPlayerTwo {
+            *self = EstimatedOutcome::WinPlayerTwo;
+            return;
+        }
         match (self, child) {
             (EstimatedOutcome::Undecided(a), EstimatedOutcome::Undecided(b)) => {
                 *a += b;
             }
-            (EstimatedOutcome::WinPlayerOne, _) | (EstimatedOutcome::WinPlayerTwo, _) => (),
             (EstimatedOutcome::Undecided(count), EstimatedOutcome::WinPlayerOne) => {
                 count.wins_player_one += 1;
+                
             }
             (EstimatedOutcome::Undecided(count), EstimatedOutcome::WinPlayerTwo) => {
                 count.wins_player_two += 1;
             }
+            _ => (),
         }
     }
 }

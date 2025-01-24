@@ -14,6 +14,7 @@ fn play_tic_tac_toe() {
         let tree = Tree::with_playouts(game, num_playouts, &mut rng);
         let best_move = tree.best_move().unwrap();
         game.play_move(&best_move);
+        // use std::io::stderr;
         // game.print_to(stderr()).unwrap();
         // eprintln!();
     }
@@ -38,6 +39,7 @@ fn prevent_immediate_win_of_other_player() {
     game.play_move(&CellIndex::new(6));
     game.play_move(&CellIndex::new(2));
     game.play_move(&CellIndex::new(8));
+    // use std::io::stderr;
     // game.print_to(stderr()).unwrap();
 
     let num_playouts = 100;
@@ -74,8 +76,6 @@ fn report_win_if_initialized_with_terminal_position() {
     game.play_move(&CellIndex::new(8));
     // game.print_to(stderr()).unwrap();
 
-
-
     let num_playouts = 1;
     let tree = Tree::with_playouts(game, num_playouts, &mut rng);
 
@@ -83,8 +83,8 @@ fn report_win_if_initialized_with_terminal_position() {
 }
 
 #[test]
-fn suggest_winning_move() {
-    let mut rng = StdRng::seed_from_u64(42);
+fn prove_win_in_one_move() {
+    let mut rng = StdRng::seed_from_u64(0);
     // -------
     // |X|O|O|
     // |-----|
@@ -101,11 +101,11 @@ fn suggest_winning_move() {
     game.play_move(&CellIndex::new(8));
     // game.print_to(stderr()).unwrap();
 
-
-
-    let num_playouts = 1;
+    // RNG works out in a way, that if we seed 42 this would work with one playout
+    let num_playouts = 3;
     let tree = Tree::with_playouts(game, num_playouts, &mut rng);
 
+    assert_eq!(EstimatedOutcome::WinPlayerOne, tree.estimate_outcome());
     assert_eq!(CellIndex::new(3), tree.best_move().unwrap())
 }
 

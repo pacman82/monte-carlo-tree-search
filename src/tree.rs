@@ -1,6 +1,6 @@
 use rand::{seq::SliceRandom as _, Rng};
 
-use crate::{count::EstimatedOutcome, simulation, Count, GameState, TwoPlayerGame};
+use crate::{count::EstimatedOutcome, simulation, TwoPlayerGame};
 
 pub struct Tree<G: TwoPlayerGame> {
     /// Game state of the root node.
@@ -23,11 +23,10 @@ where
 {
     pub fn new(game: G) -> Self {
         let mut move_buf = Vec::new();
-        let estimated_outcome = match game.state(&mut move_buf) {
-            GameState::Moves(_) | GameState::Draw => EstimatedOutcome::Undecided(Count::default()),
-            GameState::WinPlayerOne => EstimatedOutcome::WinPlayerOne,
-            GameState::WinPlayerTwo => EstimatedOutcome::WinPlayerTwo,
-        };
+        let estimated_outcome = game
+            .state(&mut move_buf)
+            .map_to_estimated_outcome()
+            .unwrap_or_default();
         let root = Node::new(usize::MAX, 0, move_buf.len(), estimated_outcome);
         let nodes = vec![root];
         let links = move_buf
@@ -56,9 +55,12 @@ where
     /// Playout one cycle of selection, expansion, simulation and backpropagation.
     pub fn playout(&mut self, rng: &mut impl Rng) {
         let (leaf_index, mut game) = self.select_leaf();
+        // expanded_index might be leaf_index, usually it will be a new child node though, in case
+        // leaf is not a terminal state
         let expanded_index = self.expand(leaf_index, &mut game, rng);
-        let count = simulation(game, &mut self.move_buf, rng);
-        self.backpropagation(expanded_index, count);
+        // Player whom gets to choose the next turn in the board the the expanded node represents.
+        let player = game.current_player();
+        self.backpropagation(expanded_index, self.nodes[expanded_index].estimated_outcome, player);
     }
 
     /// Count of playouts of the root node.
@@ -87,7 +89,9 @@ where
             .iter()
             .map(|link| {
                 let eo = if link.is_explored() {
-                    self.nodes[link.child].estimated_outcome.reward(current_player)
+                    self.nodes[link.child]
+                        .estimated_outcome
+                        .reward(current_player)
                 } else {
                     // Use default constructed estimated outcome if node is not explored yet.
                     EstimatedOutcome::default().reward(current_player)
@@ -95,7 +99,9 @@ where
                 (link.move_, eo)
             })
             .max_by(|(_move_a, reward_a), (_move_b, reward_b)| {
-                reward_a.partial_cmp(reward_b).expect("Reward must be comparable")
+                reward_a
+                    .partial_cmp(reward_b)
+                    .expect("Reward must be comparable")
             })
             .map(|(move_, _reward)| move_)
     }
@@ -143,20 +149,29 @@ where
             .collect();
         if let Some(link) = candidates.choose_mut(rng) {
             game.play(&link.move_);
-            game.state(&mut self.move_buf);
-
+            let new_node_game_state = game.state(&mut self.move_buf);
+            // Index there new node is created
             let new_node_index = self.nodes.len();
             link.child = new_node_index;
-            self.nodes.push(Node::new(
-                selected_node_index,
-                self.links.len(),
-                self.links.len() + self.move_buf.len(),
-                EstimatedOutcome::default(),
-            ));
+            let grandchildren_begin = self.links.len();
+            let grandchildren_end = grandchildren_begin + new_node_game_state.moves().len();
+            let maybe_solved_outcome = new_node_game_state.map_to_estimated_outcome();
             self.links.extend(self.move_buf.drain(..).map(|move_| Link {
                 child: usize::MAX,
                 move_,
             }));
+
+            let estimated_outcome = maybe_solved_outcome
+                // **Be careful**: move_buf will be cleared by simulation, so we should have used
+                // all relevant information from it before calling simulation.
+                .unwrap_or(EstimatedOutcome::Undecided(simulation(game.clone(), &mut self.move_buf, rng)));
+
+            self.nodes.push(Node::new(
+                selected_node_index,
+                grandchildren_begin,
+                grandchildren_end,
+                estimated_outcome,
+            ));
             new_node_index
         } else {
             // Selected child has no unexplored children => since it is a leaf, it must be in a
@@ -165,11 +180,14 @@ where
         }
     }
 
-    fn backpropagation(&mut self, node_index: usize, count: EstimatedOutcome) {
-        let mut current = Some(node_index);
+    fn backpropagation(&mut self, node_index: usize, count: EstimatedOutcome, mut player: u8) {
+        let mut node = &mut self.nodes[node_index];
+        let mut current = node.parent_index();
         while let Some(node_index) = current {
-            let node = &mut self.nodes[node_index];
-            node.estimated_outcome.propagate_child(count);
+            // 0 -> 1, 1 -> 0
+            player = (player + 1) % 2;
+            node = &mut self.nodes[node_index];
+            node.estimated_outcome.propagate_outcome(count, player);
             current = node.parent_index();
         }
     }
@@ -206,7 +224,12 @@ struct Node {
 }
 
 impl Node {
-    fn new(parent: usize, children_begin: usize, children_end: usize, estimated_outcome: EstimatedOutcome) -> Self {
+    fn new(
+        parent: usize,
+        children_begin: usize,
+        children_end: usize,
+        estimated_outcome: EstimatedOutcome,
+    ) -> Self {
         Self {
             parent,
             children_begin,
