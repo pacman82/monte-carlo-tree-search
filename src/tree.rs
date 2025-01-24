@@ -60,7 +60,11 @@ where
         let expanded_index = self.expand(leaf_index, &mut game, rng);
         // Player whom gets to choose the next turn in the board the the expanded node represents.
         let player = game.current_player();
-        self.backpropagation(expanded_index, self.nodes[expanded_index].estimated_outcome, player);
+        self.backpropagation(
+            expanded_index,
+            self.nodes[expanded_index].estimated_outcome,
+            player,
+        );
     }
 
     /// Count of playouts of the root node.
@@ -109,7 +113,7 @@ where
     pub fn num_nodes(&self) -> usize {
         self.nodes.len()
     }
-    
+
     pub fn num_links(&self) -> usize {
         self.links.len()
     }
@@ -173,7 +177,11 @@ where
             let estimated_outcome = maybe_solved_outcome
                 // **Be careful**: move_buf will be cleared by simulation, so we should have used
                 // all relevant information from it before calling simulation.
-                .unwrap_or(EstimatedOutcome::Undecided(simulation(game.clone(), &mut self.move_buf, rng)));
+                .unwrap_or(EstimatedOutcome::Undecided(simulation(
+                    game.clone(),
+                    &mut self.move_buf,
+                    rng,
+                )));
 
             self.nodes.push(Node::new(
                 selected_node_index,
@@ -196,8 +204,36 @@ where
             // 0 -> 1, 1 -> 0
             player = (player + 1) % 2;
             node = &mut self.nodes[node_index];
-            node.estimated_outcome.propagate_outcome(count, player);
+            Self::update_parent(&mut node.estimated_outcome, count, player);
             current = node.parent_index();
+        }
+    }
+
+    fn update_parent(
+        parent_outcome: &mut EstimatedOutcome,
+        propagated_outcome: EstimatedOutcome,
+        player: u8,
+    ) {
+        // If it is player ones turn (she can pick the child) she will choose a win
+        if player == 0 && propagated_outcome == EstimatedOutcome::WinPlayerOne {
+            *parent_outcome = EstimatedOutcome::WinPlayerOne;
+            return;
+        }
+        if player == 1 && propagated_outcome == EstimatedOutcome::WinPlayerTwo {
+            *parent_outcome = EstimatedOutcome::WinPlayerTwo;
+            return;
+        }
+        match (parent_outcome, propagated_outcome) {
+            (EstimatedOutcome::Undecided(a), EstimatedOutcome::Undecided(b)) => {
+                *a += b;
+            }
+            (EstimatedOutcome::Undecided(count), EstimatedOutcome::WinPlayerOne) => {
+                count.wins_player_one += 1;
+            }
+            (EstimatedOutcome::Undecided(count), EstimatedOutcome::WinPlayerTwo) => {
+                count.wins_player_two += 1;
+            }
+            _ => (),
         }
     }
 

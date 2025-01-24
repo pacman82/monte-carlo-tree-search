@@ -43,12 +43,12 @@ impl EstimatedOutcome {
                 if player == 0 {
                     f32::MAX
                 } else {
-                    f32::EPSILON
+                    0.0
                 }
             }
             EstimatedOutcome::WinPlayerTwo => {
                 if player == 0 {
-                    f32::EPSILON
+                    0.0
                 } else {
                     f32::MAX
                 }
@@ -62,31 +62,6 @@ impl EstimatedOutcome {
             EstimatedOutcome::Undecided(count) => count.total(),
             EstimatedOutcome::WinPlayerOne => 1,
             EstimatedOutcome::WinPlayerTwo => 1,
-        }
-    }
-
-    pub(crate) fn propagate_outcome(&mut self, child: EstimatedOutcome, player: u8) {
-        // If it is player ones turn (she can pick the child) she will choose a win
-        if player == 0 && child == EstimatedOutcome::WinPlayerOne{
-            *self = EstimatedOutcome::WinPlayerOne;
-            return;
-        }
-        if player == 1 && child == EstimatedOutcome::WinPlayerTwo {
-            *self = EstimatedOutcome::WinPlayerTwo;
-            return;
-        }
-        match (self, child) {
-            (EstimatedOutcome::Undecided(a), EstimatedOutcome::Undecided(b)) => {
-                *a += b;
-            }
-            (EstimatedOutcome::Undecided(count), EstimatedOutcome::WinPlayerOne) => {
-                count.wins_player_one += 1;
-                
-            }
-            (EstimatedOutcome::Undecided(count), EstimatedOutcome::WinPlayerTwo) => {
-                count.wins_player_two += 1;
-            }
-            _ => (),
         }
     }
 }
