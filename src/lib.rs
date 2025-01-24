@@ -1,4 +1,5 @@
 mod count;
+mod player;
 mod simulation;
 mod tree;
 mod two_player_game;
@@ -9,4 +10,5 @@ pub use self::{
     count::{Count, Evaluation},
     tree::Tree,
     two_player_game::{GameState, TwoPlayerGame},
+    player::Player,
 };

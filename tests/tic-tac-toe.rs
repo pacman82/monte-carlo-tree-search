@@ -1,6 +1,6 @@
 use std::ops::{Deref, DerefMut};
 
-use monte_carlo_tree_search::{Evaluation, GameState, Tree, TwoPlayerGame};
+use monte_carlo_tree_search::{Evaluation, GameState, Player, Tree, TwoPlayerGame};
 use rand::{rngs::StdRng, SeedableRng as _};
 use tic_tac_toe_board::{CellIndex, TicTacToeState};
 
@@ -110,7 +110,7 @@ fn report_win_if_initialized_with_terminal_position() {
     let num_playouts = 1;
     let tree = Tree::with_playouts(game, num_playouts, &mut rng);
 
-    assert_eq!(Evaluation::WinPlayerOne, tree.estimate_outcome())
+    assert_eq!(Evaluation::Win(Player::One), tree.estimate_outcome())
 }
 
 #[test]
@@ -136,7 +136,7 @@ fn solve_win_in_one_move() {
     let num_playouts = 3;
     let tree = Tree::with_playouts(game, num_playouts, &mut rng);
 
-    assert_eq!(Evaluation::WinPlayerOne, tree.estimate_outcome());
+    assert_eq!(Evaluation::Win(Player::One), tree.estimate_outcome());
     assert_eq!(CellIndex::new(3), tree.best_move().unwrap())
 }
 
@@ -162,7 +162,7 @@ fn solve_defeat_in_two_moves() {
     let num_playouts = 15;
     let tree = Tree::with_playouts(game, num_playouts, &mut rng);
 
-    assert_eq!(Evaluation::WinPlayerOne, tree.estimate_outcome());
+    assert_eq!(Evaluation::Win(Player::One), tree.estimate_outcome());
     print_move_statistics(&tree);
 }
 
@@ -186,7 +186,7 @@ fn solve_win_in_five_moves() {
     let tree = Tree::with_playouts(game, num_playouts, &mut rng);
 
     print_move_statistics(&tree);
-    assert_eq!(Evaluation::WinPlayerOne, tree.estimate_outcome());
+    assert_eq!(Evaluation::Win(Player::One), tree.estimate_outcome());
 }
 
 /// With few or zero playouts, we can be in a situation, there not all nodes of the root are

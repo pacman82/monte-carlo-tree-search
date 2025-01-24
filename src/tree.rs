@@ -1,6 +1,6 @@
 use rand::{seq::SliceRandom as _, Rng};
 
-use crate::{count::Evaluation, simulation, Count, TwoPlayerGame};
+use crate::{count::Evaluation, Player, simulation, Count, TwoPlayerGame};
 
 pub struct Tree<G: TwoPlayerGame> {
     /// Game state of the root node.
@@ -226,28 +226,28 @@ where
         choosing_player: u8,
     ) -> (Evaluation, Evaluation) {
         let old_evaluation = self.nodes[node_index].evaluation;
-        if propagated_evaluation == Evaluation::WinPlayerOne {
+        if propagated_evaluation == Evaluation::Win(Player::One) {
             // If it is player ones turn (she can pick the child) she will choose a win
             if choosing_player == 0 {
-                return (Evaluation::WinPlayerOne, Evaluation::WinPlayerOne);
+                return (Evaluation::Win(Player::One), Evaluation::Win(Player::One));
             }
             // If it is another player choosing, can we avoid a win of player one at all?
             if self.children(node_index).all(|link| {
-                link.is_explored() && self.nodes[link.child].evaluation == Evaluation::WinPlayerOne
+                link.is_explored() && self.nodes[link.child].evaluation == Evaluation::Win(Player::One)
             }) {
                 // Seems no matter what player two chooses player one will win
-                return (Evaluation::WinPlayerOne, Evaluation::WinPlayerOne);
+                return (Evaluation::Win(Player::One), Evaluation::Win(Player::One));
             }
         }
-        if propagated_evaluation == Evaluation::WinPlayerTwo {
+        if propagated_evaluation == Evaluation::Win(Player::Two) {
             if choosing_player == 1 {
-                return (Evaluation::WinPlayerTwo, Evaluation::WinPlayerTwo);
+                return (Evaluation::Win(Player::Two), Evaluation::Win(Player::Two));
             }
             if self.children(node_index).all(|link| {
-                link.is_explored() && self.nodes[link.child].evaluation == Evaluation::WinPlayerTwo
+                link.is_explored() && self.nodes[link.child].evaluation == Evaluation::Win(Player::Two)
             }) {
                 // Seems no matter what player two chooses player one will win
-                return (Evaluation::WinPlayerTwo, Evaluation::WinPlayerTwo);
+                return (Evaluation::Win(Player::Two), Evaluation::Win(Player::Two));
             }
         }
         match (old_evaluation, propagated_evaluation) {
@@ -255,7 +255,7 @@ where
                 a += b;
                 (Evaluation::Undecided(a), Evaluation::Undecided(b))
             }
-            (Evaluation::Undecided(mut count), Evaluation::WinPlayerOne) => {
+            (Evaluation::Undecided(mut count), Evaluation::Win(Player::One)) => {
                 count.wins_player_one += 1;
                 (Evaluation::Undecided(count), Evaluation::Undecided(Count {
                     wins_player_one: 1,
@@ -263,7 +263,7 @@ where
                     draws: 0,
                 }))
             }
-            (Evaluation::Undecided(mut count), Evaluation::WinPlayerTwo) => {
+            (Evaluation::Undecided(mut count), Evaluation::Win(Player::Two)) => {
                 count.wins_player_two += 1;
                 (Evaluation::Undecided(count), Evaluation::Undecided(Count {
                     wins_player_one: 0,

@@ -1,9 +1,10 @@
 use std::ops::AddAssign;
 
+use crate::Player;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Evaluation {
-    WinPlayerOne,
-    WinPlayerTwo,
+    Win(Player),
     /// The outcome could not be proven to be either a win, loss or draw.
     Undecided(Count),
 }
@@ -18,14 +19,14 @@ impl Evaluation {
     pub fn reward(&self, player: u8) -> f32 {
         match self {
             Evaluation::Undecided(count) => count.reward(player),
-            Evaluation::WinPlayerOne => {
+            Evaluation::Win(Player::One) => {
                 if player == 0 {
                     1.0
                 } else {
                     0.0
                 }
             }
-            Evaluation::WinPlayerTwo => {
+            Evaluation::Win(Player::Two) => {
                 if player == 0 {
                     0.0
                 } else {
@@ -39,14 +40,14 @@ impl Evaluation {
     pub (crate) fn selection_weight(&self, total_visits_parent: f32, player: u8) -> f32 {
         match self {
             Evaluation::Undecided(count) => count.ucb(total_visits_parent, player),
-            Evaluation::WinPlayerOne => {
+            Evaluation::Win(Player::One) => {
                 if player == 0 {
                     f32::MAX
                 } else {
                     0.0
                 }
             }
-            Evaluation::WinPlayerTwo => {
+            Evaluation::Win(Player::Two) => {
                 if player == 0 {
                     0.0
                 } else {
@@ -60,8 +61,7 @@ impl Evaluation {
     pub(crate) fn total(&self) -> u32 {
         match self {
             Evaluation::Undecided(count) => count.total(),
-            Evaluation::WinPlayerOne => 1,
-            Evaluation::WinPlayerTwo => 1,
+            Evaluation::Win(_) => 1,
         }
     }
 }

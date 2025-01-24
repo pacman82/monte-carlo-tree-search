@@ -1,4 +1,4 @@
-use crate::{Count, Evaluation};
+use crate::{Count, Evaluation, Player};
 
 /// Two Player games are games there two players alternate taking turns, until the game ends in
 /// either victory for one player (and defeat for the other) or a draw.
@@ -52,8 +52,8 @@ impl<M> GameState<'_, M> {
                 wins_player_one: 0,
                 wins_player_two: 0,
             })),
-            GameState::WinPlayerOne => Some(Evaluation::WinPlayerOne),
-            GameState::WinPlayerTwo => Some(Evaluation::WinPlayerTwo),
+            GameState::WinPlayerOne => Some(Evaluation::Win(Player::One)),
+            GameState::WinPlayerTwo => Some(Evaluation::Win(Player::Two)),
         }
     }
 }
