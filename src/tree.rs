@@ -72,9 +72,7 @@ where
         self.nodes[0].evaluation
     }
 
-    pub fn estimated_outcome_by_move(
-        &self,
-    ) -> impl Iterator<Item = (G::Move, Evaluation)> + '_ {
+    pub fn estimated_outcome_by_move(&self) -> impl Iterator<Item = (G::Move, Evaluation)> + '_ {
         let root = &self.nodes[0];
         self.links[root.children_begin..root.children_end]
             .iter()
@@ -93,9 +91,7 @@ where
             .iter()
             .map(|link| {
                 let eo = if link.is_explored() {
-                    self.nodes[link.child]
-                        .evaluation
-                        .reward(current_player)
+                    self.nodes[link.child].evaluation.reward(current_player)
                 } else {
                     // Use default constructed estimated outcome if node is not explored yet.
                     Evaluation::default().reward(current_player)
@@ -213,18 +209,35 @@ where
     fn updated_evaluation(
         &self,
         node_index: usize,
-        propagated_outcome: Evaluation,
+        propagated_evaluation: Evaluation,
         choosing_player: u8,
-    ) -> Evaluation{
+    ) -> Evaluation {
         let old_evaluation = self.nodes[node_index].evaluation;
-        // If it is player ones turn (she can pick the child) she will choose a win
-        if choosing_player == 0 && propagated_outcome == Evaluation::WinPlayerOne {
-            return Evaluation::WinPlayerOne;
+        if propagated_evaluation == Evaluation::WinPlayerOne {
+            // If it is player ones turn (she can pick the child) she will choose a win
+            if choosing_player == 0 {
+                return Evaluation::WinPlayerOne;
+            }
+            // If it is another player choosing, can we avoid a win of player one at all?
+            if self.children(node_index).all(|link| {
+                link.is_explored() && self.nodes[link.child].evaluation == Evaluation::WinPlayerOne
+            }) {
+                // Seems no matter what player two chooses player one will win
+                return Evaluation::WinPlayerOne;
+            }
         }
-        if choosing_player == 1 && propagated_outcome == Evaluation::WinPlayerTwo {
-            return Evaluation::WinPlayerTwo;
+        if propagated_evaluation == Evaluation::WinPlayerTwo {
+            if choosing_player == 1 {
+                return Evaluation::WinPlayerTwo;
+            }
+            if self.children(node_index).all(|link| {
+                link.is_explored() && self.nodes[link.child].evaluation == Evaluation::WinPlayerTwo
+            }) {
+                // Seems no matter what player two chooses player one will win
+                return Evaluation::WinPlayerTwo;
+            }
         }
-        match (old_evaluation, propagated_outcome) {
+        match (old_evaluation, propagated_evaluation) {
             (Evaluation::Undecided(mut a), Evaluation::Undecided(b)) => {
                 a += b;
                 Evaluation::Undecided(a)

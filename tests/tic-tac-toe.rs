@@ -39,21 +39,26 @@ fn prevent_immediate_win_of_other_player() {
     game.play_move(&CellIndex::new(6));
     game.play_move(&CellIndex::new(2));
     game.play_move(&CellIndex::new(8));
+    
     // use std::io::stderr;
     // game.print_to(stderr()).unwrap();
 
     let num_playouts = 100;
     let tree = Tree::with_playouts(game, num_playouts, &mut rng);
+    print_move_statistics(&tree);
+    assert_eq!(CellIndex::new(7), tree.best_move().unwrap());
+}
+
+fn print_move_statistics(tree: &Tree<TicTacToe>) {
     let counts = tree.estimated_outcome_by_move().collect::<Vec<_>>();
     for (mv, count) in counts {
         eprintln!(
             "Move: {:?} Count: {:?}, Reward: {}",
             mv,
             count,
-            count.reward(0)
+            count.reward(0),
         );
     }
-    assert_eq!(CellIndex::new(7), tree.best_move().unwrap());
 }
 
 #[test]
@@ -83,7 +88,7 @@ fn report_win_if_initialized_with_terminal_position() {
 }
 
 #[test]
-fn prove_win_in_one_move() {
+fn solve_win_in_one_move() {
     let mut rng = StdRng::seed_from_u64(0);
     // -------
     // |X|O|O|
@@ -109,12 +114,63 @@ fn prove_win_in_one_move() {
     assert_eq!(CellIndex::new(3), tree.best_move().unwrap())
 }
 
+#[test]
+fn solve_defeat_in_two_moves() {
+    let mut rng = StdRng::seed_from_u64(0);
+    // -------
+    // |X|O|O|
+    // |-----|
+    // |3|X|5|
+    // |-----|
+    // |X|7|8|
+    // -------
+    // X has two possibilities to win, 3 and 8. So no matter what O plays, X will win.
+    let mut game = TicTacToe::new();
+    game.play_move(&CellIndex::new(4));
+    game.play_move(&CellIndex::new(1));
+    game.play_move(&CellIndex::new(6));
+    game.play_move(&CellIndex::new(2));
+    game.play_move(&CellIndex::new(0));
+    // game.print_to(stderr()).unwrap();
+
+    // RNG works out in a way, that if we seed 42 this would work with one playout
+    let num_playouts = 15;
+    let tree = Tree::with_playouts(game, num_playouts, &mut rng);
+
+    assert_eq!(Evaluation::WinPlayerOne, tree.estimate_outcome());
+    print_move_statistics(&tree);
+}
+
+#[test]
+fn solve_win_in_five_moves() {
+    let mut rng = StdRng::seed_from_u64(0);
+    // -------
+    // |0|O|2|
+    // |-----|
+    // |3|X|5|
+    // |-----|
+    // |6|7|8|
+    // -------
+    // X has several winning moves here
+    let mut game = TicTacToe::new();
+    game.play_move(&CellIndex::new(4));
+    game.play_move(&CellIndex::new(1));
+    // game.print_to(stderr()).unwrap();
+
+    // RNG works out in a way, that if we seed 42 this would work with one playout
+    let num_playouts = 72;
+    let tree = Tree::with_playouts(game, num_playouts, &mut rng);
+
+    print_move_statistics(&tree);
+    assert_eq!(Evaluation::WinPlayerOne, tree.estimate_outcome());
+}
+
 /// With few or zero playouts, we can be in a situation, there not all nodes of the root are
 /// explored. We want to handle unexplored direct children of the root node, withouth panic.
 #[test]
 fn unexplored_root_childs() {
     let game = TicTacToe::new();
-    
+
     let tree = Tree::new(game);
 
     assert!(tree.best_move().is_some())

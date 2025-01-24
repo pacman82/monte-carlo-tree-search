@@ -36,7 +36,7 @@ impl Evaluation {
     }
 
     /// A weight used to decide how much we want to explore this node.
-    pub(crate) fn selection_weight(&self, total_visits_parent: f32, player: u8) -> f32 {
+    pub (crate) fn selection_weight(&self, total_visits_parent: f32, player: u8) -> f32 {
         match self {
             Evaluation::Undecided(count) => count.ucb(total_visits_parent, player),
             Evaluation::WinPlayerOne => {
