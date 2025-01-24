@@ -1,6 +1,6 @@
 use rand::{seq::SliceRandom as _, Rng};
 
-use crate::{count::Evaluation, simulation, TwoPlayerGame};
+use crate::{count::Evaluation, simulation, Count, TwoPlayerGame};
 
 pub struct Tree<G: TwoPlayerGame> {
     /// Game state of the root node.
@@ -58,7 +58,7 @@ where
         // expanded_index might be leaf_index, usually it will be a new child node though, in case
         // leaf is not a terminal state
         let expanded_index = self.expand(leaf_index, &mut game, rng);
-        // Player whom gets to choose the next turn in the board the the expanded node represents.
+        // Player whom gets to choose the next turn in the board the (new) leaf node represents.
         let player = game.current_player();
         self.backpropagation(
             expanded_index,
@@ -112,6 +112,10 @@ where
 
     pub fn num_links(&self) -> usize {
         self.links.len()
+    }
+
+    pub fn game(&self) -> &G {
+        &self.game
     }
 
     /// Selects a leaf of the tree for exploration. The selected leaf is not solved yet. I.e. we
@@ -173,7 +177,7 @@ where
             let estimated_outcome = maybe_solved_outcome
                 // **Be careful**: move_buf will be cleared by simulation, so we should have used
                 // all relevant information from it before calling simulation.
-                .unwrap_or(Evaluation::Undecided(simulation(
+                .unwrap_or_else(|| Evaluation::Undecided(simulation(
                     game.clone(),
                     &mut self.move_buf,
                     rng,
@@ -193,64 +197,81 @@ where
         }
     }
 
-    fn backpropagation(&mut self, node_index: usize, count: Evaluation, mut player: u8) {
+    fn backpropagation(&mut self, node_index: usize, mut delta: Evaluation, mut player: u8) {
         let mut current = self.nodes[node_index].parent_index();
-        while let Some(node_index) = current {
+        while let Some(current_node_index) = current {
             // 0 -> 1, 1 -> 0
             player = (player + 1) % 2;
 
-            let updated_outcome = self.updated_evaluation(node_index, count, player);
-            let node = &mut self.nodes[node_index];
-            node.evaluation = updated_outcome;
+            // **Bug**: We can not use count indiscriminately here, we must turn a deterministic
+            // win into an add, in order to not be to deterministic in our backpropagation.
+            let (updated_evaluation, new_delta) = self.updated_evaluation(current_node_index, delta, player);
+            delta = new_delta;
+            let node = &mut self.nodes[current_node_index];
+            node.evaluation = updated_evaluation;
             current = node.parent_index();
         }
     }
 
+    /// Update the evaluation of a node with the propagated evaluation.
+    /// 
+    /// # Return
+    /// 
+    /// First element is the evaluation of the node specified in node_index. The second element is
+    /// the delta which should be propagated to its parrent node
     fn updated_evaluation(
         &self,
         node_index: usize,
         propagated_evaluation: Evaluation,
         choosing_player: u8,
-    ) -> Evaluation {
+    ) -> (Evaluation, Evaluation) {
         let old_evaluation = self.nodes[node_index].evaluation;
         if propagated_evaluation == Evaluation::WinPlayerOne {
             // If it is player ones turn (she can pick the child) she will choose a win
             if choosing_player == 0 {
-                return Evaluation::WinPlayerOne;
+                return (Evaluation::WinPlayerOne, Evaluation::WinPlayerOne);
             }
             // If it is another player choosing, can we avoid a win of player one at all?
             if self.children(node_index).all(|link| {
                 link.is_explored() && self.nodes[link.child].evaluation == Evaluation::WinPlayerOne
             }) {
                 // Seems no matter what player two chooses player one will win
-                return Evaluation::WinPlayerOne;
+                return (Evaluation::WinPlayerOne, Evaluation::WinPlayerOne);
             }
         }
         if propagated_evaluation == Evaluation::WinPlayerTwo {
             if choosing_player == 1 {
-                return Evaluation::WinPlayerTwo;
+                return (Evaluation::WinPlayerTwo, Evaluation::WinPlayerTwo);
             }
             if self.children(node_index).all(|link| {
                 link.is_explored() && self.nodes[link.child].evaluation == Evaluation::WinPlayerTwo
             }) {
                 // Seems no matter what player two chooses player one will win
-                return Evaluation::WinPlayerTwo;
+                return (Evaluation::WinPlayerTwo, Evaluation::WinPlayerTwo);
             }
         }
         match (old_evaluation, propagated_evaluation) {
             (Evaluation::Undecided(mut a), Evaluation::Undecided(b)) => {
                 a += b;
-                Evaluation::Undecided(a)
+                (Evaluation::Undecided(a), Evaluation::Undecided(b))
             }
             (Evaluation::Undecided(mut count), Evaluation::WinPlayerOne) => {
                 count.wins_player_one += 1;
-                Evaluation::Undecided(count)
+                (Evaluation::Undecided(count), Evaluation::Undecided(Count {
+                    wins_player_one: 1,
+                    wins_player_two: 0,
+                    draws: 0,
+                }))
             }
             (Evaluation::Undecided(mut count), Evaluation::WinPlayerTwo) => {
                 count.wins_player_two += 1;
-                Evaluation::Undecided(count)
+                (Evaluation::Undecided(count), Evaluation::Undecided(Count {
+                    wins_player_one: 0,
+                    wins_player_two: 1,
+                    draws: 0,
+                }))
             }
-            _ => old_evaluation,
+            _ => (old_evaluation, Evaluation::default()),
         }
     }
 

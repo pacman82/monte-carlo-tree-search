@@ -24,7 +24,7 @@ fn play_tic_tac_toe() {
 }
 
 #[test]
-fn prevent_immediate_win_of_other_player() {
+fn prevent_immediate_win_of_player_two() {
     let mut rng = StdRng::seed_from_u64(42);
     // -------
     // | | |X|
@@ -49,6 +49,32 @@ fn prevent_immediate_win_of_other_player() {
     assert_eq!(CellIndex::new(7), tree.best_move().unwrap());
 }
 
+#[test]
+fn prevent_immediate_win_of_player_one() {
+    let mut rng = StdRng::seed_from_u64(42);
+    // -------
+    // | | |X|
+    // |-----|
+    // | |X| |
+    // |-----|
+    // |O|X|O|
+    // -------
+    let mut game = TicTacToe::new();
+    game.play_move(&CellIndex::new(4));
+    game.play_move(&CellIndex::new(6));
+    game.play_move(&CellIndex::new(2));
+    game.play_move(&CellIndex::new(8));
+    game.play_move(&CellIndex::new(7));
+    
+    // use std::io::stderr;
+    // game.print_to(stderr()).unwrap();
+
+    let num_playouts = 25;
+    let tree = Tree::with_playouts(game, num_playouts, &mut rng);
+    print_move_statistics(&tree);
+    assert_eq!(CellIndex::new(1), tree.best_move().unwrap());
+}
+
 fn print_move_statistics(tree: &Tree<TicTacToe>) {
     let counts = tree.estimated_outcome_by_move().collect::<Vec<_>>();
     for (mv, count) in counts {
@@ -56,7 +82,7 @@ fn print_move_statistics(tree: &Tree<TicTacToe>) {
             "Move: {:?} Count: {:?}, Reward: {}",
             mv,
             count,
-            count.reward(0),
+            count.reward(tree.game().current_player()) ,
         );
     }
 }
@@ -133,7 +159,6 @@ fn solve_defeat_in_two_moves() {
     game.play_move(&CellIndex::new(0));
     // game.print_to(stderr()).unwrap();
 
-    // RNG works out in a way, that if we seed 42 this would work with one playout
     let num_playouts = 15;
     let tree = Tree::with_playouts(game, num_playouts, &mut rng);
 
@@ -157,8 +182,7 @@ fn solve_win_in_five_moves() {
     game.play_move(&CellIndex::new(1));
     // game.print_to(stderr()).unwrap();
 
-    // RNG works out in a way, that if we seed 42 this would work with one playout
-    let num_playouts = 72;
+    let num_playouts = 272;
     let tree = Tree::with_playouts(game, num_playouts, &mut rng);
 
     print_move_statistics(&tree);
