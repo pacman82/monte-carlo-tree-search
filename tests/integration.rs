@@ -16,8 +16,8 @@ fn player_one_always_wins() {
             GameState::WinPlayerOne
         }
 
-        fn current_player(&self) -> u8 {
-            0
+        fn current_player(&self) -> Player {
+            Player::One
         }
     }
 

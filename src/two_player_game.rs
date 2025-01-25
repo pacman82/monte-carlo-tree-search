@@ -23,7 +23,7 @@ pub trait TwoPlayerGame: Clone {
     /// two who makes the second move. If the board is in a terminal position, it should return the
     /// player those turn it would be, i.e. the player which did not play the last move. Currently
     /// the trait requires turns to be alternating.
-    fn current_player(&self) -> u8;
+    fn current_player(&self) -> Player;
 }
 
 /// Possible states defining a game

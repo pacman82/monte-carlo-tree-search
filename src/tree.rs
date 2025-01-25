@@ -1,6 +1,6 @@
 use rand::{seq::SliceRandom as _, Rng};
 
-use crate::{count::Evaluation, Player, simulation, Count, TwoPlayerGame};
+use crate::{count::Evaluation, Player, simulation, TwoPlayerGame};
 
 pub struct Tree<G: TwoPlayerGame> {
     /// Game state of the root node.
@@ -197,11 +197,10 @@ where
         }
     }
 
-    fn backpropagation(&mut self, node_index: usize, mut delta: Evaluation, mut player: u8) {
+    fn backpropagation(&mut self, node_index: usize, mut delta: Evaluation, mut player: Player) {
         let mut current = self.nodes[node_index].parent_index();
         while let Some(current_node_index) = current {
-            // 0 -> 1, 1 -> 0
-            player = (player + 1) % 2;
+            player.flip();
 
             // **Bug**: We can not use count indiscriminately here, we must turn a deterministic
             // win into an add, in order to not be to deterministic in our backpropagation.
@@ -223,53 +222,30 @@ where
         &self,
         node_index: usize,
         propagated_evaluation: Evaluation,
-        choosing_player: u8,
+        choosing_player: Player,
     ) -> (Evaluation, Evaluation) {
         let old_evaluation = self.nodes[node_index].evaluation;
-        if propagated_evaluation == Evaluation::Win(Player::One) {
-            // If it is player ones turn (she can pick the child) she will choose a win
-            if choosing_player == 0 {
-                return (Evaluation::Win(Player::One), Evaluation::Win(Player::One));
-            }
+        if propagated_evaluation == Evaluation::Win(choosing_player) {
+            // If it is the choosing players turn, she will choose a win
+            return (propagated_evaluation, propagated_evaluation);
+        }
+        if propagated_evaluation == Evaluation::Win(choosing_player.other()) {
             // If it is another player choosing, can we avoid a win of player one at all?
             if self.children(node_index).all(|link| {
-                link.is_explored() && self.nodes[link.child].evaluation == Evaluation::Win(Player::One)
+                link.is_explored() && self.nodes[link.child].evaluation == propagated_evaluation
             }) {
-                // Seems no matter what player two chooses player one will win
-                return (Evaluation::Win(Player::One), Evaluation::Win(Player::One));
-            }
-        }
-        if propagated_evaluation == Evaluation::Win(Player::Two) {
-            if choosing_player == 1 {
-                return (Evaluation::Win(Player::Two), Evaluation::Win(Player::Two));
-            }
-            if self.children(node_index).all(|link| {
-                link.is_explored() && self.nodes[link.child].evaluation == Evaluation::Win(Player::Two)
-            }) {
-                // Seems no matter what player two chooses player one will win
-                return (Evaluation::Win(Player::Two), Evaluation::Win(Player::Two));
+                // Seems no matter what the other player chooses, the winnig player will win
+                return (propagated_evaluation, propagated_evaluation);
             }
         }
         match (old_evaluation, propagated_evaluation) {
             (Evaluation::Undecided(mut a), Evaluation::Undecided(b)) => {
                 a += b;
-                (Evaluation::Undecided(a), Evaluation::Undecided(b))
+                (Evaluation::Undecided(a), propagated_evaluation)
             }
-            (Evaluation::Undecided(mut count), Evaluation::Win(Player::One)) => {
-                count.wins_player_one += 1;
-                (Evaluation::Undecided(count), Evaluation::Undecided(Count {
-                    wins_player_one: 1,
-                    wins_player_two: 0,
-                    draws: 0,
-                }))
-            }
-            (Evaluation::Undecided(mut count), Evaluation::Win(Player::Two)) => {
-                count.wins_player_two += 1;
-                (Evaluation::Undecided(count), Evaluation::Undecided(Count {
-                    wins_player_one: 0,
-                    wins_player_two: 1,
-                    draws: 0,
-                }))
+            (Evaluation::Undecided(mut count), Evaluation::Win(winning_player)) => {
+                count.report_win_for(winning_player);
+                (Evaluation::Undecided(count), propagated_evaluation.into_undecided())
             }
             _ => (old_evaluation, Evaluation::default()),
         }

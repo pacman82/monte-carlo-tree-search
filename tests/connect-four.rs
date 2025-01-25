@@ -17,7 +17,7 @@ fn play_move_connect_four() {
             "Score child {:?}: {:?} Reward: {:?}",
             move_,
             score,
-            score.reward(0)
+            score.reward(Player::One)
         );
     }
 }
@@ -50,8 +50,8 @@ fn play_against_perfect_solver_as_player_one() {
             eprintln!("nodes: {} links: {}", tree.num_nodes(), tree.num_links());
             tree.estimated_outcome_by_move()
                 .max_by(|(_, score_a), (_, score_b)| {
-                    let a = score_a.reward(0);
-                    let b = score_b.reward(0);
+                    let a = score_a.reward(Player::One);
+                    let b = score_b.reward(Player::One);
                     a.partial_cmp(&b).unwrap()
                 })
                 .unwrap()
@@ -111,7 +111,11 @@ impl TwoPlayerGame for ConnectFour {
         self.0.play(*column);
     }
 
-    fn current_player(&self) -> u8 {
-        self.0.stones() % 2
+    fn current_player(&self) -> Player {
+        if self.0.stones() % 2 == 0 {
+            Player::One
+        } else {
+            Player::Two
+        }
     }
 }

@@ -244,12 +244,12 @@ impl TwoPlayerGame for TicTacToe {
         self.0.play_move(mv);
     }
 
-    fn current_player(&self) -> u8 {
+    fn current_player(&self) -> Player {
         match self.0.state() {
             TicTacToeState::TurnPlayerOne
             | TicTacToeState::VictoryPlayerTwo
-            | TicTacToeState::Draw => 0,
-            TicTacToeState::TurnPlayerTwo | TicTacToeState::VictoryPlayerOne => 1,
+            | TicTacToeState::Draw => Player::One,
+            TicTacToeState::TurnPlayerTwo | TicTacToeState::VictoryPlayerOne => Player::Two,
         }
     }
 }
