@@ -5,7 +5,8 @@ use crate::Player;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Evaluation {
     Win(Player),
-    /// The outcome could not be proven to be either a win, loss or draw.
+    Draw,
+    /// The outcome could not yet be proven to be either a win, loss or draw.
     Undecided(Count),
 }
 
@@ -19,6 +20,7 @@ impl Evaluation {
     pub fn reward(&self, judging_player: Player) -> f32 {
         match self {
             Evaluation::Undecided(count) => count.reward(judging_player),
+            Evaluation::Draw => 0.5,
             Evaluation::Win(winning_player) => {
                 if judging_player == *winning_player {
                     1.0
@@ -33,6 +35,7 @@ impl Evaluation {
     pub (crate) fn selection_weight(&self, total_visits_parent: f32, selecting_player: Player) -> f32 {
         match self {
             Evaluation::Undecided(count) => count.ucb(total_visits_parent, selecting_player),
+            Evaluation::Draw => 0.5,
             Evaluation::Win(winning_player) => {
                 if selecting_player == *winning_player {
                     f32::MAX
@@ -47,13 +50,14 @@ impl Evaluation {
     pub(crate) fn total(&self) -> u32 {
         match self {
             Evaluation::Undecided(count) => count.total(),
-            Evaluation::Win(_) => 1,
+            Evaluation::Win(_) | Evaluation::Draw => 1,
         }
     }
 
     pub (crate) fn into_undecided(self) -> Evaluation {
         match self {
             Evaluation::Undecided(_) => self,
+            Evaluation::Draw => Evaluation::Undecided(Count { draws: 1, ..Count::default() }),
             Evaluation::Win(player) => {
                 let mut count = Count::default();
                 count.report_win_for(player);
