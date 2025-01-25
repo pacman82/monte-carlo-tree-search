@@ -77,8 +77,13 @@ where
         self.links[root.children_begin..root.children_end]
             .iter()
             .map(move |link| {
-                let child = &self.nodes[link.child];
-                (link.move_, child.evaluation)
+                if link.is_explored() {
+                    let child = &self.nodes[link.child];
+                    (link.move_, child.evaluation)    
+                } else {
+                    (link.move_, Evaluation::default())
+                }
+                
             })
     }
 

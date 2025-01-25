@@ -56,7 +56,7 @@ fn prevent_immediate_win_of_player_two() {
     // game.print_to(stderr()).unwrap();
 
     let num_playouts = 34;
-    let tree = Tree::with_playouts(game, num_playouts, &mut rng);;
+    let tree = Tree::with_playouts(game, num_playouts, &mut rng);
     print_move_statistics(&tree);
     assert_eq!(CellIndex::new(7), tree.best_move().unwrap());
 }
@@ -123,6 +123,95 @@ fn report_win_if_initialized_with_terminal_position() {
     let tree = Tree::with_playouts(game, num_playouts, &mut rng);
 
     assert_eq!(Evaluation::Win(Player::One), tree.evaluation())
+}
+
+#[test]
+fn solve_draw_in_one_move() {
+    let mut rng = StdRng::seed_from_u64(0);
+    // -------
+    // |O|X|O|
+    // |-----|
+    // |X|X|O|
+    // |-----|
+    // |X|O|8|
+    // -------
+    let mut game = TicTacToe::new();
+    game.play_move(&CellIndex::new(4));
+    game.play_move(&CellIndex::new(0));
+    game.play_move(&CellIndex::new(1));
+    game.play_move(&CellIndex::new(7));
+    game.play_move(&CellIndex::new(6));
+    game.play_move(&CellIndex::new(2));
+    game.play_move(&CellIndex::new(3));
+    game.play_move(&CellIndex::new(5));
+
+    // game.print_to(stderr()).unwrap();
+
+    // RNG works out in a way, that if we seed 42 this would work with one playout
+    let num_playouts = 1;
+    let tree = Tree::with_playouts(game, num_playouts, &mut rng);
+
+    print_move_statistics(&tree);
+    assert_eq!(Evaluation::Draw, tree.evaluation());
+    assert_eq!(CellIndex::new(8), tree.best_move().unwrap())
+}
+
+#[test]
+fn solve_draw_in_two_moves() {
+    let mut rng = StdRng::seed_from_u64(0);
+    // -------
+    // |O|X|O|
+    // |-----|
+    // |X|X|5|
+    // |-----|
+    // |X|O|8|
+    // -------
+    let mut game = TicTacToe::new();
+    game.play_move(&CellIndex::new(4));
+    game.play_move(&CellIndex::new(0));
+    game.play_move(&CellIndex::new(1));
+    game.play_move(&CellIndex::new(7));
+    game.play_move(&CellIndex::new(6));
+    game.play_move(&CellIndex::new(2));
+    game.play_move(&CellIndex::new(3));
+
+    // game.print_to(stderr()).unwrap();
+
+    // RNG works out in a way, that if we seed 42 this would work with one playout
+    let num_playouts = 4;
+    let tree = Tree::with_playouts(game, num_playouts, &mut rng);
+
+    print_move_statistics(&tree);
+    assert_eq!(Evaluation::Draw, tree.evaluation());
+    assert_eq!(CellIndex::new(5), tree.best_move().unwrap())
+}
+
+#[test]
+fn solve_draw_in_three_moves() {
+    let mut rng = StdRng::seed_from_u64(0);
+    // -------
+    // |O|X|O|
+    // |-----|
+    // |3|X|5|
+    // |-----|
+    // |X|O|8|
+    // -------
+    let mut game = TicTacToe::new();
+    game.play_move(&CellIndex::new(4));
+    game.play_move(&CellIndex::new(0));
+    game.play_move(&CellIndex::new(1));
+    game.play_move(&CellIndex::new(7));
+    game.play_move(&CellIndex::new(6));
+    game.play_move(&CellIndex::new(2));
+
+    // game.print_to(stderr()).unwrap();
+
+    // RNG works out in a way, that if we seed 42 this would work with one playout
+    let num_playouts = 15;
+    let tree = Tree::with_playouts(game, num_playouts, &mut rng);
+
+    print_move_statistics(&tree);
+    assert_eq!(Evaluation::Draw, tree.evaluation());
 }
 
 #[test]
@@ -209,7 +298,9 @@ fn unexplored_root_childs() {
 
     let tree = Tree::new(game);
 
-    assert!(tree.best_move().is_some())
+    assert!(tree.best_move().is_some());
+    // Just iterate to see that we do not panic in case child is unexplored
+    assert_eq!(9,tree.estimated_outcome_by_move().count());
 }
 
 /// Strict alias, so we can implement trait for type
