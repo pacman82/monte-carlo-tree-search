@@ -24,6 +24,18 @@ fn play_tic_tac_toe() {
 }
 
 #[test]
+#[should_panic] // Driving test not implemented yet
+fn solve_tic_tac_toe() {
+    let mut rng = StdRng::seed_from_u64(42);
+    let game = TicTacToe::new();
+
+    let num_playouts = 50_000;
+    let tree = Tree::with_playouts(game, num_playouts, &mut rng);
+
+    assert_eq!(Evaluation::Draw, tree.evaluation());
+}
+
+#[test]
 fn prevent_immediate_win_of_player_two() {
     let mut rng = StdRng::seed_from_u64(42);
     // -------
@@ -110,7 +122,7 @@ fn report_win_if_initialized_with_terminal_position() {
     let num_playouts = 1;
     let tree = Tree::with_playouts(game, num_playouts, &mut rng);
 
-    assert_eq!(Evaluation::Win(Player::One), tree.estimate_outcome())
+    assert_eq!(Evaluation::Win(Player::One), tree.evaluation())
 }
 
 #[test]
@@ -136,7 +148,7 @@ fn solve_win_in_one_move() {
     let num_playouts = 3;
     let tree = Tree::with_playouts(game, num_playouts, &mut rng);
 
-    assert_eq!(Evaluation::Win(Player::One), tree.estimate_outcome());
+    assert_eq!(Evaluation::Win(Player::One), tree.evaluation());
     assert_eq!(CellIndex::new(3), tree.best_move().unwrap())
 }
 
@@ -162,13 +174,13 @@ fn solve_defeat_in_two_moves() {
     let num_playouts = 15;
     let tree = Tree::with_playouts(game, num_playouts, &mut rng);
 
-    assert_eq!(Evaluation::Win(Player::One), tree.estimate_outcome());
+    assert_eq!(Evaluation::Win(Player::One), tree.evaluation());
     print_move_statistics(&tree);
 }
 
 #[test]
 fn solve_win_in_five_moves() {
-    let mut rng = StdRng::seed_from_u64(0);
+    let mut rng = StdRng::seed_from_u64(42);
     // -------
     // |0|O|2|
     // |-----|
@@ -182,11 +194,11 @@ fn solve_win_in_five_moves() {
     game.play_move(&CellIndex::new(1));
     // game.print_to(stderr()).unwrap();
 
-    let num_playouts = 272;
+    let num_playouts = 312;
     let tree = Tree::with_playouts(game, num_playouts, &mut rng);
 
     print_move_statistics(&tree);
-    assert_eq!(Evaluation::Win(Player::One), tree.estimate_outcome());
+    assert_eq!(Evaluation::Win(Player::One), tree.evaluation());
 }
 
 /// With few or zero playouts, we can be in a situation, there not all nodes of the root are

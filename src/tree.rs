@@ -68,7 +68,7 @@ where
     }
 
     /// Count of playouts of the root node.
-    pub fn estimate_outcome(&self) -> Evaluation {
+    pub fn evaluation(&self) -> Evaluation {
         self.nodes[0].evaluation
     }
 

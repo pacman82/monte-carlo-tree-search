@@ -25,5 +25,5 @@ fn player_one_always_wins() {
 
     let tree = Tree::new(game);
 
-    assert_eq!(Evaluation::Win(Player::One), tree.estimate_outcome());
+    assert_eq!(Evaluation::Win(Player::One), tree.evaluation());
 }

@@ -30,7 +30,7 @@ fn start_from_terminal_position() {
 
     assert_eq!(
         Evaluation::Win(Player::One),
-        tree.estimate_outcome()
+        tree.evaluation()
     );
 }
 
