@@ -28,10 +28,7 @@ fn start_from_terminal_position() {
     let game = ConnectFour::from_move_list("1212121");
     let tree = Tree::new(game);
 
-    assert_eq!(
-        Evaluation::Win(Player::One),
-        tree.evaluation()
-    );
+    assert_eq!(Evaluation::Win(Player::One), tree.evaluation());
 }
 
 #[test]
@@ -48,18 +45,36 @@ fn play_against_perfect_solver_as_player_one() {
             let num_playouts = 1_000;
             let tree = Tree::with_playouts(ConnectFour(game), num_playouts, &mut rng);
             eprintln!("nodes: {} links: {}", tree.num_nodes(), tree.num_links());
-            tree.estimated_outcome_by_move()
-                .max_by(|(_, score_a), (_, score_b)| {
-                    let a = score_a.reward(Player::One);
-                    let b = score_b.reward(Player::One);
-                    a.partial_cmp(&b).unwrap()
-                })
-                .unwrap()
-                .0
+            tree.best_move().unwrap()
         } else {
             solver.best_moves(&game, &mut moves);
             *moves.choose(&mut rng).unwrap()
         };
+        eprintln!("column: {next_move}");
+        game.play(next_move);
+        eprintln!("{game}");
+    }
+}
+
+#[test]
+#[ignore = "Computes a long time. More a design exploration, than an actual test"]
+fn play_against_yourself() {
+    let mut rng = StdRng::seed_from_u64(42);
+
+    let mut game = connect_four_solver::ConnectFour::new();
+
+    let num_playouts_player_one = 10_000;
+    let num_playouts_player_two = 1_000;
+
+    while !game.is_over() {
+        let num_playouts = if game.stones() % 2 == 0 {
+            num_playouts_player_one
+        } else {
+            num_playouts_player_two
+        };
+        let tree = Tree::with_playouts(ConnectFour(game), num_playouts, &mut rng);
+        eprintln!("nodes: {} links: {}", tree.num_nodes(), tree.num_links());
+        let next_move = tree.best_move().unwrap();
         eprintln!("column: {next_move}");
         game.play(next_move);
         eprintln!("{game}");
