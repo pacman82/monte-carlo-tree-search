@@ -1,4 +1,4 @@
-use std::fmt::{self, Display};
+use std::{io::Write, fmt::{self, Display}};
 
 use connect_four_solver::{Column, Solver};
 use monte_carlo_tree_search::{Evaluation, GameState, Player, Tree, TwoPlayerGame};
@@ -12,12 +12,11 @@ fn play_move_connect_four() {
 
     let tree = Tree::with_playouts(game, num_playouts, &mut rng);
 
-    for (move_, score) in tree.estimated_outcome_by_move() {
+    for (move_, eval) in tree.estimated_outcome_by_move() {
         eprintln!(
-            "Score child {:?}: {:?} Reward: {:?}",
+            "Eval child {:?}: {:?} ",
             move_,
-            score,
-            score.reward(Player::One)
+            eval,
         );
     }
 }
@@ -29,6 +28,28 @@ fn start_from_terminal_position() {
     let tree = Tree::new(game);
 
     assert_eq!(Evaluation::Win(Player::One), tree.evaluation());
+}
+
+/// Position occured once letting the tree play against itself, for some reason the solver did not
+/// find the obvious winning move (`1`).
+#[test]
+fn position_42442445555772222514171766() {
+    let game = ConnectFour::from_move_list("424424455557722225141717");
+    eprintln!("{game}");
+    // | |X| |O| | | |
+    // | |O| |X|O| | |
+    // | |X| |O|X| |O|
+    // |X|O| |O|O| |O|
+    // |X|X| |X|X| |X|
+    // |X|O| |X|O| |O|
+    // ---------------
+    //  1 2 3 4 5 6 7
+
+    let mut rng = StdRng::seed_from_u64(42);
+    let num_playouts = 1_000;
+    let tree = Tree::with_playouts(game, num_playouts, &mut rng);
+    print_move_statistics(&tree);
+    assert_eq!(Column::from_index(0), tree.best_move().unwrap());
 }
 
 #[test]
@@ -65,6 +86,7 @@ fn play_against_yourself() {
 
     let num_playouts_player_one = 10_000;
     let num_playouts_player_two = 1_000;
+    let mut history = Vec::new();
 
     while !game.is_over() {
         let num_playouts = if game.stones() % 2 == 0 {
@@ -76,8 +98,21 @@ fn play_against_yourself() {
         eprintln!("nodes: {} links: {}", tree.num_nodes(), tree.num_links());
         let next_move = tree.best_move().unwrap();
         eprintln!("column: {next_move}");
+        write!(&mut history, "{next_move}").unwrap();
         game.play(next_move);
         eprintln!("{game}");
+    }
+    eprint!("History: {}", String::from_utf8(history).unwrap());
+}
+
+fn print_move_statistics(tree: &Tree<ConnectFour>) {
+    let evals = tree.estimated_outcome_by_move().collect::<Vec<_>>();
+    for (mv, eval) in evals {
+        eprintln!(
+            "Move: {:?} Eval: {:?}",
+            mv,
+            eval,
+        );
     }
 }
 

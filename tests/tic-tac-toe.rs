@@ -88,13 +88,12 @@ fn prevent_immediate_win_of_player_one() {
 }
 
 fn print_move_statistics(tree: &Tree<TicTacToe>) {
-    let counts = tree.estimated_outcome_by_move().collect::<Vec<_>>();
-    for (mv, count) in counts {
+    let evals = tree.estimated_outcome_by_move().collect::<Vec<_>>();
+    for (mv, eval) in evals {
         eprintln!(
-            "Move: {:?} Count: {:?}, Reward: {}",
+            "Move: {:?} Count: {:?}",
             mv,
-            count,
-            count.reward(tree.game().current_player()) ,
+            eval,
         );
     }
 }

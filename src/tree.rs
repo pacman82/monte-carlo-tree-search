@@ -83,7 +83,6 @@ where
                 } else {
                     (link.move_, Evaluation::default())
                 }
-                
             })
     }
 
@@ -95,18 +94,16 @@ where
         self.links[root.children_begin..root.children_end]
             .iter()
             .map(|link| {
-                let eo = if link.is_explored() {
-                    self.nodes[link.child].evaluation.reward(current_player)
+                let eval = if link.is_explored() {
+                    self.nodes[link.child].evaluation
                 } else {
                     // Use default constructed estimated outcome if node is not explored yet.
-                    Evaluation::default().reward(current_player)
+                    Evaluation::default()
                 };
-                (link.move_, eo)
+                (link.move_, eval)
             })
-            .max_by(|(_move_a, reward_a), (_move_b, reward_b)| {
-                reward_a
-                    .partial_cmp(reward_b)
-                    .expect("Reward must be comparable")
+            .max_by(|(_move_a, eval_a), (_move_b, eval_b)| {
+                eval_a.cmp_for(eval_b, current_player)
             })
             .map(|(move_, _reward)| move_)
     }

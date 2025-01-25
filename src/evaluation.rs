@@ -1,4 +1,4 @@
-use std::ops::AddAssign;
+use std::{cmp::Ordering, ops::AddAssign};
 
 use crate::Player;
 
@@ -11,22 +11,42 @@ pub enum Evaluation {
 }
 
 impl Evaluation {
-    /// A value between 0 and 1 indicating, how rewarding this outcome is for the given player. 0
-    /// indicates a loss, 1 a win and 0.5 a draw. However 0.5 could also indicate an outcome which
-    /// is very undecided and poses and advantage for neither player. The reward function does
-    /// **not** include a term to encourge exploration. It is best used to choose a move after the
-    /// tree search has been completed.
-    pub fn reward(&self, judging_player: Player) -> f32 {
-        match self {
-            Evaluation::Undecided(count) => count.reward(judging_player),
-            Evaluation::Draw => 0.5,
-            Evaluation::Win(winning_player) => {
-                if judging_player == *winning_player {
-                    1.0
+
+    /// Compare two evaluations from the perspective of the given player. Ordering is such that the
+    /// greater argument is more favorable for the player.
+    pub fn cmp_for(&self, other: &Evaluation, player: Player) -> Ordering {
+        match (self, other) {
+            (Evaluation::Win(p1), Evaluation::Win(p2)) => {
+                if *p1 == *p2 {
+                    Ordering::Equal
+                } else if *p1 == player {
+                    Ordering::Greater
                 } else {
-                    0.0
+                    Ordering::Less
                 }
             }
+            (Evaluation::Win(p1), _) => {
+                if *p1 == player {
+                    Ordering::Greater
+                } else {
+                    Ordering::Less
+                }
+            }
+            (Evaluation::Draw, Evaluation::Win(p2)) => {
+                if *p2 == player {
+                    Ordering::Less
+                } else {
+                    Ordering::Greater
+                }
+            }
+            (Evaluation::Draw, Evaluation::Draw) => Ordering::Equal,
+            (Evaluation::Draw, Evaluation::Undecided(count)) => {
+                0.5.partial_cmp(&count.reward(player)).unwrap()
+            }
+            (Evaluation::Undecided(c1), Evaluation::Undecided(c2)) => {
+                c1.reward(player).partial_cmp(&c2.reward(player)).unwrap()
+            }
+            (a, b) => b.cmp_for(a, player).reverse()
         }
     }
 
@@ -73,29 +93,6 @@ impl Evaluation {
         }
     }
 
-    /// `true` if the board evaluating to `self` is **proven** to be better or at least as good as
-    /// other for the given player.
-    pub fn strictly_not_worse_for(&self, other: &Evaluation, player: Player) -> bool {
-        match (self, other) {
-            // We can not do better than a win for the judging player
-            (Evaluation::Win(s), Evaluation::Win(o)) => {
-                if player == *s {
-                    true
-                } else {
-                    *o != player
-                }
-            }
-            (Evaluation::Win(s), Evaluation::Undecided(_))
-            | (Evaluation::Win(s), Evaluation::Draw) => *s == player,
-            (Evaluation::Draw, Evaluation::Win(o))
-            | (Evaluation::Undecided(_), Evaluation::Win(o)) => *o != player,
-            (Evaluation::Draw, Evaluation::Draw) => true,
-            (Evaluation::Draw, Evaluation::Undecided(_))
-            | (Evaluation::Undecided(_), Evaluation::Undecided(_))
-            | (Evaluation::Undecided(_), Evaluation::Draw) => false,
-        }
-    }
-
     pub fn is_solved(&self) -> bool {
         match self {
             Evaluation::Win(_) | Evaluation::Draw => true,
@@ -119,8 +116,11 @@ pub struct Count {
 }
 
 impl Count {
-    /// Assign a score of 1 for winning, 0 for loosing and 0.5 for a draw. Divided by the number of
-    /// playouts. Zero playouts will result in a score of 0.5.
+    /// A value between 0 and 1 indicating, how rewarding this outcome is for the given player. 0
+    /// indicates a loss, 1 a win and 0.5 a draw. However 0.5 could also indicate an outcome which
+    /// is very undecided and poses and advantage for neither player. The reward function does
+    /// **not** include a term to encourge exploration. It is best used to choose a move after the
+    /// tree search has been completed.
     pub fn reward(&self, judging_player: Player) -> f32 {
         let total = self.total();
         if self.total() == 0 {
@@ -164,36 +164,30 @@ impl AddAssign for Count {
 
 #[cfg(test)]
 mod test {
+    use std::cmp::Ordering;
+
     use crate::{Count, Evaluation, Player};
 
     #[test]
-    fn strictly_not_worse_for_examples() {
-        assert!(Evaluation::Win(Player::One)
-            .strictly_not_worse_for(&Evaluation::Win(Player::One), Player::One));
-        assert!(Evaluation::Win(Player::One)
-            .strictly_not_worse_for(&Evaluation::Win(Player::One), Player::Two));
-        assert!(!Evaluation::Win(Player::Two)
-            .strictly_not_worse_for(&Evaluation::Win(Player::One), Player::One));
-        assert!(Evaluation::Win(Player::One)
-            .strictly_not_worse_for(&Evaluation::Win(Player::Two), Player::One));
-        assert!(Evaluation::Win(Player::One).strictly_not_worse_for(&Evaluation::Draw, Player::One));
-        assert!(
-            !Evaluation::Win(Player::Two).strictly_not_worse_for(&Evaluation::Draw, Player::One)
-        );
-        assert!(
-            !Evaluation::Draw.strictly_not_worse_for(&Evaluation::Win(Player::One), Player::One)
-        );
-        assert!(Evaluation::Draw.strictly_not_worse_for(&Evaluation::Win(Player::Two), Player::One));
-        assert!(Evaluation::Draw.strictly_not_worse_for(&Evaluation::Draw, Player::One));
-        assert!(!Evaluation::Draw
-            .strictly_not_worse_for(&Evaluation::Undecided(Count::default()), Player::One));
-        assert!(!Evaluation::Undecided(Count::default())
-            .strictly_not_worse_for(&Evaluation::Win(Player::One), Player::One));
-        assert!(Evaluation::Undecided(Count::default())
-            .strictly_not_worse_for(&Evaluation::Win(Player::Two), Player::One));
-        assert!(!Evaluation::Undecided(Count::default())
-            .strictly_not_worse_for(&Evaluation::Undecided(Count::default()), Player::One));
-        assert!(!Evaluation::Undecided(Count::default())
-            .strictly_not_worse_for(&Evaluation::Draw, Player::One));
+    fn compare_evaluations() {
+        let win_player_one = Evaluation::Win(Player::One);
+        let win_player_two = Evaluation::Win(Player::Two);
+        let draw = Evaluation::Draw;
+        let one = Player::One;
+        let two = Player::Two;
+
+        assert_eq!(win_player_one.cmp_for(&win_player_one, one), Ordering::Equal);
+        assert_eq!(win_player_one.cmp_for(&win_player_two, one), Ordering::Greater);
+        assert_eq!(win_player_one.cmp_for(&win_player_two, two), Ordering::Less);
+        assert_eq!(win_player_one.cmp_for(&draw, one), Ordering::Greater);
+        assert_eq!(win_player_one.cmp_for(&draw, two), Ordering::Less);
+        assert_eq!(draw.cmp_for(&win_player_one, one), Ordering::Less);
+        assert_eq!(draw.cmp_for(&win_player_two, one), Ordering::Greater);
+        assert_eq!(draw.cmp_for(&draw, one), Ordering::Equal);
+        assert_eq!(draw.cmp_for(&Evaluation::Undecided(Count { draws: 1, ..Count::default()}), one), Ordering::Equal);
+        assert_eq!(draw.cmp_for(&Evaluation::Undecided(Count { wins_player_one: 1, ..Count::default()}), one), Ordering::Less);
+        assert_eq!(Evaluation::Undecided(Count { wins_player_one: 1, ..Count::default() }).cmp_for(&win_player_one, one), Ordering::Less);
+        assert_eq!(Evaluation::Undecided(Count { wins_player_two: 1, ..Count::default() }).cmp_for(&win_player_two, one), Ordering::Greater);
+        assert_eq!(Evaluation::Undecided(Count { wins_player_one: 1, ..Count::default() }).cmp_for(&Evaluation::Undecided(Count { wins_player_two: 1, ..Count::default()}), one), Ordering::Greater);
     }
 }
