@@ -66,6 +66,7 @@ fn play_against_perfect_solver_as_player_one() {
             let num_playouts = 1_000;
             let tree = Tree::with_playouts(ConnectFour(game), num_playouts, &mut rng);
             eprintln!("nodes: {} links: {}", tree.num_nodes(), tree.num_links());
+            print_move_statistics(&tree);
             tree.best_move().unwrap()
         } else {
             solver.best_moves(&game, &mut moves);
