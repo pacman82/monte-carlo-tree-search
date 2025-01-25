@@ -1,6 +1,6 @@
 use rand::{seq::SliceRandom as _, Rng};
 
-use crate::{count::Evaluation, Player, simulation, TwoPlayerGame};
+use crate::{evaluation::Evaluation, simulation, Player, TwoPlayerGame};
 
 pub struct Tree<G: TwoPlayerGame> {
     /// Game state of the root node.
@@ -25,7 +25,7 @@ where
         let mut move_buf = Vec::new();
         let estimated_outcome = game
             .state(&mut move_buf)
-            .map_to_estimated_outcome()
+            .map_terminal_to_evaluation()
             .unwrap_or_default();
         let root = Node::new(usize::MAX, 0, move_buf.len(), estimated_outcome);
         let nodes = vec![root];
@@ -129,7 +129,7 @@ where
         let mut game = self.game.clone();
         while !self.is_leaf(current_node_index) {
             let best_ucb = self
-                .children(current_node_index)
+                .child_links(current_node_index)
                 .max_by(|a, b| {
                     let a = self.nodes[a.child].evaluation.selection_weight(
                         self.nodes[current_node_index].evaluation.total() as f32,
@@ -168,20 +168,19 @@ where
             link.child = new_node_index;
             let grandchildren_begin = self.links.len();
             let grandchildren_end = grandchildren_begin + new_node_game_state.moves().len();
-            let maybe_solved_outcome = new_node_game_state.map_to_estimated_outcome();
+            let maybe_solved_outcome = new_node_game_state.map_terminal_to_evaluation();
             self.links.extend(self.move_buf.drain(..).map(|move_| Link {
                 child: usize::MAX,
                 move_,
             }));
 
+            // If not solved yet we simulate an outcome
             let estimated_outcome = maybe_solved_outcome
                 // **Be careful**: move_buf will be cleared by simulation, so we should have used
                 // all relevant information from it before calling simulation.
-                .unwrap_or_else(|| Evaluation::Undecided(simulation(
-                    game.clone(),
-                    &mut self.move_buf,
-                    rng,
-                )));
+                .unwrap_or_else(|| {
+                    Evaluation::Undecided(simulation(game.clone(), &mut self.move_buf, rng))
+                });
 
             self.nodes.push(Node::new(
                 selected_node_index,
@@ -204,7 +203,8 @@ where
 
             // **Bug**: We can not use count indiscriminately here, we must turn a deterministic
             // win into an add, in order to not be to deterministic in our backpropagation.
-            let (updated_evaluation, new_delta) = self.updated_evaluation(current_node_index, delta, player);
+            let (updated_evaluation, new_delta) =
+                self.updated_evaluation(current_node_index, delta, player);
             delta = new_delta;
             let node = &mut self.nodes[current_node_index];
             node.evaluation = updated_evaluation;
@@ -213,9 +213,9 @@ where
     }
 
     /// Update the evaluation of a node with the propagated evaluation.
-    /// 
+    ///
     /// # Return
-    /// 
+    ///
     /// First element is the evaluation of the node specified in node_index. The second element is
     /// the delta which should be propagated to its parrent node
     fn updated_evaluation(
@@ -229,38 +229,56 @@ where
             // If it is the choosing players turn, she will choose a win
             return (propagated_evaluation, propagated_evaluation);
         }
-        if propagated_evaluation == Evaluation::Win(choosing_player.other()) {
-            // If it is another player choosing, can we avoid a win of player one at all?
-            if self.children(node_index).all(|link| {
-                link.is_explored() && self.nodes[link.child].evaluation == propagated_evaluation
-            }) {
-                // Seems no matter what the other player chooses, the winnig player will win
-                return (propagated_evaluation, propagated_evaluation);
+        // If the choosing player is not guaranteed to win let's check if there is a draw or a loss
+        if propagated_evaluation.is_solved() {
+            let mut acc = Some(Evaluation::Win(choosing_player.other()));
+            for link in self.child_links(node_index) {
+                if !link.is_explored() {
+                    // Found unexplored node, so we can not be sure its a draw or loss
+                    acc = None;
+                    break;
+                }
+                if self.nodes[link.child].evaluation == Evaluation::Draw {
+                    // Found a draw, so we can be sure its not a loss
+                    acc = Some(Evaluation::Draw);
+                } else if self.nodes[link.child].evaluation
+                    != Evaluation::Win(choosing_player.other())
+                {
+                    // Found a child neither draw or loss, so we can not make a statement about the
+                    // parent.
+                    acc = None;
+                    break;
+                }
+            }
+            if let Some(evaluation) = acc {
+                return (evaluation, evaluation);
             }
         }
-        match (old_evaluation, propagated_evaluation) {
-            (Evaluation::Undecided(mut a), Evaluation::Undecided(b)) => {
-                a += b;
-                (Evaluation::Undecided(a), propagated_evaluation)
+        // No deterministic outcome, let's propagete the counts
+        let propageted_count = propagated_evaluation.into_count();
+
+        match old_evaluation {
+            Evaluation::Undecided(mut count) => {
+                count += propageted_count;
+                (
+                    Evaluation::Undecided(count),
+                    Evaluation::Undecided(propageted_count),
+                )
             }
-            (Evaluation::Undecided(mut count), Evaluation::Win(winning_player)) => {
-                count.report_win_for(winning_player);
-                (Evaluation::Undecided(count), propagated_evaluation.into_undecided())
-            }
-            _ => (old_evaluation, Evaluation::default()),
+            _ => (old_evaluation, Evaluation::Undecided(propageted_count)),
         }
     }
 
     /// A leaf is any node with no children or unexplored children
     fn is_leaf(&self, node_index: usize) -> bool {
-        let mut it = self.children(node_index);
+        let mut it = self.child_links(node_index);
         if it.len() == 0 {
             return true;
         }
         it.any(|link| !link.is_explored())
     }
 
-    fn children(&self, node_index: usize) -> impl ExactSizeIterator<Item = Link<G::Move>> + '_ {
+    fn child_links(&self, node_index: usize) -> impl ExactSizeIterator<Item = Link<G::Move>> + '_ {
         let node = &self.nodes[node_index];
         self.links[node.children_begin..node.children_end]
             .iter()

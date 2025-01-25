@@ -29,7 +29,7 @@ fn solve_tic_tac_toe() {
     let mut rng = StdRng::seed_from_u64(42);
     let game = TicTacToe::new();
 
-    let num_playouts = 50_000;
+    let num_playouts = 1_000;
     let tree = Tree::with_playouts(game, num_playouts, &mut rng);
 
     assert_eq!(Evaluation::Draw, tree.evaluation());
@@ -55,8 +55,8 @@ fn prevent_immediate_win_of_player_two() {
     // use std::io::stderr;
     // game.print_to(stderr()).unwrap();
 
-    let num_playouts = 100;
-    let tree = Tree::with_playouts(game, num_playouts, &mut rng);
+    let num_playouts = 34;
+    let tree = Tree::with_playouts(game, num_playouts, &mut rng);;
     print_move_statistics(&tree);
     assert_eq!(CellIndex::new(7), tree.best_move().unwrap());
 }

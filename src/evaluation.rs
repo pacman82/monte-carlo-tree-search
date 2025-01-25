@@ -11,7 +11,6 @@ pub enum Evaluation {
 }
 
 impl Evaluation {
-
     /// A value between 0 and 1 indicating, how rewarding this outcome is for the given player. 0
     /// indicates a loss, 1 a win and 0.5 a draw. However 0.5 could also indicate an outcome which
     /// is very undecided and poses and advantage for neither player. The reward function does
@@ -32,7 +31,11 @@ impl Evaluation {
     }
 
     /// A weight used to decide how much we want to explore this node.
-    pub (crate) fn selection_weight(&self, total_visits_parent: f32, selecting_player: Player) -> f32 {
+    pub(crate) fn selection_weight(
+        &self,
+        total_visits_parent: f32,
+        selecting_player: Player,
+    ) -> f32 {
         match self {
             Evaluation::Undecided(count) => count.ucb(total_visits_parent, selecting_player),
             Evaluation::Draw => 0.5,
@@ -54,15 +57,49 @@ impl Evaluation {
         }
     }
 
-    pub (crate) fn into_undecided(self) -> Evaluation {
+    /// Convert solved solutions to their underterministic counter part
+    pub(crate) fn into_count(self) -> Count {
         match self {
-            Evaluation::Undecided(_) => self,
-            Evaluation::Draw => Evaluation::Undecided(Count { draws: 1, ..Count::default() }),
+            Evaluation::Undecided(count) => count,
+            Evaluation::Draw => Count {
+                draws: 1,
+                ..Count::default()
+            },
             Evaluation::Win(player) => {
                 let mut count = Count::default();
                 count.report_win_for(player);
-                Evaluation::Undecided(count)
+                count
             }
+        }
+    }
+
+    /// `true` if the board evaluating to `self` is **proven** to be better or at least as good as
+    /// other for the given player.
+    pub fn strictly_not_worse_for(&self, other: &Evaluation, player: Player) -> bool {
+        match (self, other) {
+            // We can not do better than a win for the judging player
+            (Evaluation::Win(s), Evaluation::Win(o)) => {
+                if player == *s {
+                    true
+                } else {
+                    *o != player
+                }
+            }
+            (Evaluation::Win(s), Evaluation::Undecided(_))
+            | (Evaluation::Win(s), Evaluation::Draw) => *s == player,
+            (Evaluation::Draw, Evaluation::Win(o))
+            | (Evaluation::Undecided(_), Evaluation::Win(o)) => *o != player,
+            (Evaluation::Draw, Evaluation::Draw) => true,
+            (Evaluation::Draw, Evaluation::Undecided(_))
+            | (Evaluation::Undecided(_), Evaluation::Undecided(_))
+            | (Evaluation::Undecided(_), Evaluation::Draw) => false,
+        }
+    }
+
+    pub fn is_solved(&self) -> bool {
+        match self {
+            Evaluation::Win(_) | Evaluation::Draw => true,
+            Evaluation::Undecided(_) => false,
         }
     }
 }
@@ -122,5 +159,41 @@ impl AddAssign for Count {
         self.wins_player_one += other.wins_player_one;
         self.wins_player_two += other.wins_player_two;
         self.draws += other.draws;
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::{Count, Evaluation, Player};
+
+    #[test]
+    fn strictly_not_worse_for_examples() {
+        assert!(Evaluation::Win(Player::One)
+            .strictly_not_worse_for(&Evaluation::Win(Player::One), Player::One));
+        assert!(Evaluation::Win(Player::One)
+            .strictly_not_worse_for(&Evaluation::Win(Player::One), Player::Two));
+        assert!(!Evaluation::Win(Player::Two)
+            .strictly_not_worse_for(&Evaluation::Win(Player::One), Player::One));
+        assert!(Evaluation::Win(Player::One)
+            .strictly_not_worse_for(&Evaluation::Win(Player::Two), Player::One));
+        assert!(Evaluation::Win(Player::One).strictly_not_worse_for(&Evaluation::Draw, Player::One));
+        assert!(
+            !Evaluation::Win(Player::Two).strictly_not_worse_for(&Evaluation::Draw, Player::One)
+        );
+        assert!(
+            !Evaluation::Draw.strictly_not_worse_for(&Evaluation::Win(Player::One), Player::One)
+        );
+        assert!(Evaluation::Draw.strictly_not_worse_for(&Evaluation::Win(Player::Two), Player::One));
+        assert!(Evaluation::Draw.strictly_not_worse_for(&Evaluation::Draw, Player::One));
+        assert!(!Evaluation::Draw
+            .strictly_not_worse_for(&Evaluation::Undecided(Count::default()), Player::One));
+        assert!(!Evaluation::Undecided(Count::default())
+            .strictly_not_worse_for(&Evaluation::Win(Player::One), Player::One));
+        assert!(Evaluation::Undecided(Count::default())
+            .strictly_not_worse_for(&Evaluation::Win(Player::Two), Player::One));
+        assert!(!Evaluation::Undecided(Count::default())
+            .strictly_not_worse_for(&Evaluation::Undecided(Count::default()), Player::One));
+        assert!(!Evaluation::Undecided(Count::default())
+            .strictly_not_worse_for(&Evaluation::Draw, Player::One));
     }
 }
