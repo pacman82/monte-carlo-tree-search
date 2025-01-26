@@ -88,7 +88,7 @@ fn prevent_immediate_win_of_player_one() {
 }
 
 fn print_move_statistics(tree: &Tree<TicTacToe>) {
-    let evals = tree.estimated_outcome_by_move().collect::<Vec<_>>();
+    let evals = tree.eval_by_move().collect::<Vec<_>>();
     for (mv, eval) in evals {
         eprintln!(
             "Move: {:?} Count: {:?}",
@@ -299,7 +299,7 @@ fn unexplored_root_childs() {
 
     assert!(tree.best_move().is_some());
     // Just iterate to see that we do not panic in case child is unexplored
-    assert_eq!(9,tree.estimated_outcome_by_move().count());
+    assert_eq!(9,tree.eval_by_move().count());
 }
 
 /// Strict alias, so we can implement trait for type

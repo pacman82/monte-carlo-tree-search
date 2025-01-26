@@ -1,3 +1,5 @@
+use std::cmp::Ordering;
+
 use rand::{seq::SliceRandom as _, Rng};
 
 use crate::{evaluation::Evaluation, simulation, Player, TwoPlayerGame};
@@ -15,6 +17,15 @@ pub struct Tree<G: TwoPlayerGame> {
     /// A buffer we use to store moves during node expansion. We have this as a member to avoid
     /// repeated allocation.
     move_buf: Vec<G::Move>,
+    /// Remember the best move from the root node. Only change this move if we find a better one.
+    /// This is different from just picking one of the best moves, as we would not replace the best
+    /// move with one that is just as good. The reason for this is that our evaluation does only
+    /// distinguish between win, draw and loss, but not contain any information about how far the
+    /// loss is away, or how many errors the opponent could make. However the win we can achieve the
+    /// earliest, is likely the best play a human would choose, and on the other hand, the position
+    /// we would take the longest to realize it is a loose, is likely the one which allows the
+    /// opponent to make the most mistakes.
+    best_link: Option<usize>,
 }
 
 impl<G> Tree<G>
@@ -41,6 +52,7 @@ where
             nodes,
             links,
             move_buf,
+            best_link: None,
         }
     }
 
@@ -65,6 +77,7 @@ where
             self.nodes[expanded_index].evaluation,
             player,
         );
+        self.update_best_link();
     }
 
     /// Count of playouts of the root node.
@@ -72,40 +85,24 @@ where
         self.nodes[0].evaluation
     }
 
-    pub fn estimated_outcome_by_move(&self) -> impl Iterator<Item = (G::Move, Evaluation)> + '_ {
+    pub fn eval_by_move(&self) -> impl Iterator<Item = (G::Move, Evaluation)> + '_ {
         let root = &self.nodes[0];
         self.links[root.children_begin..root.children_end]
             .iter()
             .map(move |link| {
                 if link.is_explored() {
                     let child = &self.nodes[link.child];
-                    (link.move_, child.evaluation)    
+                    (link.move_, child.evaluation)
                 } else {
                     (link.move_, Evaluation::default())
                 }
             })
     }
 
-    /// Picks a move with the highest reward for the current player. `None` if the root node has no
-    /// children.
+    /// Picks one of the best movesfor the current player. `None` if the root node has no children.
     pub fn best_move(&self) -> Option<G::Move> {
-        let current_player = self.game.current_player();
-        let root = &self.nodes[0];
-        self.links[root.children_begin..root.children_end]
-            .iter()
-            .map(|link| {
-                let eval = if link.is_explored() {
-                    self.nodes[link.child].evaluation
-                } else {
-                    // Use default constructed estimated outcome if node is not explored yet.
-                    Evaluation::default()
-                };
-                (link.move_, eval)
-            })
-            .max_by(|(_move_a, eval_a), (_move_b, eval_b)| {
-                eval_a.cmp_for(eval_b, current_player)
-            })
-            .map(|(move_, _reward)| move_)
+        self.best_link
+            .map(|link_index| self.links[link_index].move_)
     }
 
     pub fn num_nodes(&self) -> usize {
@@ -118,6 +115,34 @@ where
 
     pub fn game(&self) -> &G {
         &self.game
+    }
+
+    fn update_best_link(&mut self) {
+        let current_player = self.game.current_player();
+        let root = &self.nodes[0];
+        for link_index in root.children_begin..root.children_end {
+            if self.best_link.is_none() {
+                self.best_link = Some(link_index);
+                continue;
+            }
+            let candidate_evaluation = self.evaluation_by_link_index(link_index);
+            let best_so_far_evaluation = self.evaluation_by_link_index(self.best_link.unwrap());
+            if candidate_evaluation.cmp_for(&best_so_far_evaluation, current_player)
+                == Ordering::Greater
+            {
+                self.best_link = Some(link_index);
+            }
+        }
+    }
+
+    /// Evaluation of a node the link directs to. Handles unexplored nodes.
+    fn evaluation_by_link_index(&self, link_index: usize) -> Evaluation {
+        let link = self.links[link_index];
+        if link.is_explored() {
+            self.nodes[link.child].evaluation
+        } else {
+            Evaluation::default()
+        }
     }
 
     /// Selects a leaf of the tree for exploration. The selected leaf is not solved yet. I.e. we

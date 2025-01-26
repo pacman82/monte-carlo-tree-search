@@ -1,4 +1,7 @@
-use std::{io::Write, fmt::{self, Display}};
+use std::{
+    fmt::{self, Display},
+    io::Write,
+};
 
 use connect_four_solver::{Column, Solver};
 use monte_carlo_tree_search::{Evaluation, GameState, Player, Tree, TwoPlayerGame};
@@ -12,12 +15,8 @@ fn play_move_connect_four() {
 
     let tree = Tree::with_playouts(game, num_playouts, &mut rng);
 
-    for (move_, eval) in tree.estimated_outcome_by_move() {
-        eprintln!(
-            "Eval child {:?}: {:?} ",
-            move_,
-            eval,
-        );
+    for (move_, eval) in tree.eval_by_move() {
+        eprintln!("Eval child {:?}: {:?} ", move_, eval,);
     }
 }
 
@@ -52,7 +51,9 @@ fn position_424424455557722225141717() {
     assert_eq!(Column::from_index(0), tree.best_move().unwrap());
 }
 
-/// `O` needs to play `1` in order to prevent `X` from winning via `1`.
+/// `O` needs to play `1` in order to prevent `X` from winning via `1`. However, no matter what `O`
+/// plays, `X` will win. This test verifies it still plays `1`, even though all outcomes are the
+/// same considering we only solve the game weekly.
 #[test]
 fn position_42442445555772222514171() {
     let game = ConnectFour::from_move_list("42442445555772222514171");
@@ -67,11 +68,13 @@ fn position_42442445555772222514171() {
     //  1 2 3 4 5 6 7
 
     let mut rng = StdRng::seed_from_u64(42);
-    // If we increase the number of playouts two much, currently tree will find it looses even it it
-    // plays `1`. It then judges each move equally bad.
-    let num_playouts = 100;
+    // 1000 playouts are not enough to prove every move is a loss for `O`.
+    let num_playouts = 1000;
     let tree = Tree::with_playouts(game, num_playouts, &mut rng);
     print_move_statistics(&tree);
+    assert!(tree
+        .eval_by_move()
+        .all(|(_move, eval)| eval == Evaluation::Win(Player::One)));
     assert_eq!(Column::from_index(0), tree.best_move().unwrap());
 }
 
@@ -130,13 +133,9 @@ fn play_against_yourself() {
 }
 
 fn print_move_statistics(tree: &Tree<ConnectFour>) {
-    let evals = tree.estimated_outcome_by_move().collect::<Vec<_>>();
+    let evals = tree.eval_by_move().collect::<Vec<_>>();
     for (mv, eval) in evals {
-        eprintln!(
-            "Move: {:?} Eval: {:?}",
-            mv,
-            eval,
-        );
+        eprintln!("Move: {:?} Eval: {:?}", mv, eval,);
     }
 }
 
