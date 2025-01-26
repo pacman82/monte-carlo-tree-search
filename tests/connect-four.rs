@@ -33,7 +33,7 @@ fn start_from_terminal_position() {
 /// Position occured once letting the tree play against itself, for some reason the solver did not
 /// find the obvious winning move (`1`).
 #[test]
-fn position_42442445555772222514171766() {
+fn position_424424455557722225141717() {
     let game = ConnectFour::from_move_list("424424455557722225141717");
     eprintln!("{game}");
     // | |X| |O| | | |
@@ -47,6 +47,29 @@ fn position_42442445555772222514171766() {
 
     let mut rng = StdRng::seed_from_u64(42);
     let num_playouts = 1_000;
+    let tree = Tree::with_playouts(game, num_playouts, &mut rng);
+    print_move_statistics(&tree);
+    assert_eq!(Column::from_index(0), tree.best_move().unwrap());
+}
+
+/// `O` needs to play `1` in order to prevent `X` from winning via `1`.
+#[test]
+fn position_42442445555772222514171() {
+    let game = ConnectFour::from_move_list("42442445555772222514171");
+    eprintln!("{game}");
+    // | |X| |O| | | |
+    // | |O| |X|O| | |
+    // | |X| |O|X| | |
+    // |X|O| |O|O| |O|
+    // |X|X| |X|X| |X|
+    // |X|O| |X|O| |O|
+    // ---------------
+    //  1 2 3 4 5 6 7
+
+    let mut rng = StdRng::seed_from_u64(42);
+    // If we increase the number of playouts two much, currently tree will find it looses even it it
+    // plays `1`. It then judges each move equally bad.
+    let num_playouts = 100;
     let tree = Tree::with_playouts(game, num_playouts, &mut rng);
     print_move_statistics(&tree);
     assert_eq!(Column::from_index(0), tree.best_move().unwrap());
