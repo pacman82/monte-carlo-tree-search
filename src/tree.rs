@@ -17,6 +17,9 @@ pub struct Tree<G: TwoPlayerGame> {
     /// A buffer we use to store moves during node expansion. We have this as a member to avoid
     /// repeated allocation.
     move_buf: Vec<G::Move>,
+    /// In order to choose a child node to expand at random, we (re)use this buffer in order to
+    /// avoid its repeated allocation.
+    candidate_link_index_buf: Vec<usize>,
     /// Remember the best move from the root node. Only change this move if we find a better one.
     /// This is different from just picking one of the best moves, as we would not replace the best
     /// move with one that is just as good. The reason for this is that our evaluation does only
@@ -36,8 +39,7 @@ where
         let mut move_buf = Vec::new();
         let estimated_outcome = game
             .state(&mut move_buf)
-            .map_terminal_to_evaluation()
-            .unwrap_or_default();
+            .map_to_evaluation();
         let root = Node::new(usize::MAX, 0, move_buf.len(), estimated_outcome);
         let nodes = vec![root];
         let links: Vec<_> = move_buf
@@ -55,6 +57,7 @@ where
             nodes,
             links,
             move_buf,
+            candidate_link_index_buf: Vec::new(),
             best_link,
         }
     }
@@ -77,8 +80,16 @@ where
         };
         // Create a new child node for the selected node and let `game` represent its state
         let new_node_index = self.expand(to_be_expanded_index, &mut game, rng);
+
         // Player whom gets to choose the next turn in the board the (new) leaf node represents.
         let player = game.current_player();
+
+        // If the game is not in a terminal state, start a simulation to gain an initial estimate
+        if !self.nodes[new_node_index].evaluation.is_solved() {
+            let count = simulation(game, &mut self.move_buf, rng);
+            self.nodes[new_node_index].evaluation = Evaluation::Undecided(count);
+        }
+
         self.backpropagation(
             new_node_index,
             self.nodes[new_node_index].evaluation,
@@ -195,6 +206,20 @@ where
         Some((current_node_index, game))
     }
 
+    /// Link index of a random unexplored child of the selected node.
+    fn pick_unexplored_child_of(&mut self, node_index: usize, rng: &mut impl Rng) -> usize {
+        let node = &self.nodes[node_index];
+        let child_links_indices = node.children_begin..node.children_end;
+        self.candidate_link_index_buf.clear();
+        self.candidate_link_index_buf.extend(
+            child_links_indices.filter(|&link_index| !self.links[link_index].is_explored()),
+        );
+        self.candidate_link_index_buf
+            .choose(rng)
+            .copied()
+            .expect("To be expandend node must have unexplored children")
+    }
+
     /// Expand an unexplored child of the selected node. Mutates `game` to represent state of the
     /// node indicated by the retunned index.
     ///
@@ -202,17 +227,8 @@ where
     ///
     /// Index of newly created child node.
     fn expand(&mut self, to_be_expanded_index: usize, game: &mut G, rng: &mut impl Rng) -> usize {
-        let to_be_expanded_node = &self.nodes[to_be_expanded_index];
-        let child_links =
-            &mut self.links[to_be_expanded_node.children_begin..to_be_expanded_node.children_end];
-        // We should avoid the allocation of a vector here, for now I let it stand.
-        let mut candidates: Vec<_> = child_links
-            .iter_mut()
-            .filter(|link| !link.is_explored())
-            .collect();
-        let link = candidates
-            .choose_mut(rng)
-            .expect("To be expandend node must have unexplored children");
+        let link_index = self.pick_unexplored_child_of(to_be_expanded_index, rng);
+        let link = &mut self.links[link_index];
 
         game.play(&link.move_);
         let new_node_game_state = game.state(&mut self.move_buf);
@@ -221,25 +237,17 @@ where
         link.child = new_node_index;
         let grandchildren_begin = self.links.len();
         let grandchildren_end = grandchildren_begin + new_node_game_state.moves().len();
-        let maybe_solved_outcome = new_node_game_state.map_terminal_to_evaluation();
+        let eval = new_node_game_state.map_to_evaluation();
         self.links.extend(self.move_buf.drain(..).map(|move_| Link {
             child: usize::MAX,
             move_,
         }));
 
-        // If not solved yet we simulate an outcome
-        let estimated_outcome = maybe_solved_outcome
-            // **Be careful**: move_buf will be cleared by simulation, so we should have used
-            // all relevant information from it before calling simulation.
-            .unwrap_or_else(|| {
-                Evaluation::Undecided(simulation(game.clone(), &mut self.move_buf, rng))
-            });
-
         self.nodes.push(Node::new(
             to_be_expanded_index,
             grandchildren_begin,
             grandchildren_end,
-            estimated_outcome,
+            eval,
         ));
         new_node_index
     }

@@ -1,4 +1,4 @@
-use crate::{Evaluation, Player};
+use crate::{Count, Evaluation, Player};
 
 /// Two Player games are games there two players alternate taking turns, until the game ends in
 /// either victory for one player (and defeat for the other) or a draw.
@@ -44,12 +44,12 @@ impl<M> GameState<'_, M> {
         }
     }
 
-    pub (crate) fn map_terminal_to_evaluation(&self) -> Option<Evaluation> {
+    pub (crate) fn map_to_evaluation(&self) -> Evaluation {
         match self {
-            GameState::Moves(_) => None,
-            GameState::Draw => Some(Evaluation::Draw),
-            GameState::WinPlayerOne => Some(Evaluation::Win(Player::One)),
-            GameState::WinPlayerTwo => Some(Evaluation::Win(Player::Two)),
+            GameState::Moves(_) => Evaluation::Undecided(Count::default()),
+            GameState::Draw => Evaluation::Draw,
+            GameState::WinPlayerOne => Evaluation::Win(Player::One),
+            GameState::WinPlayerTwo => Evaluation::Win(Player::Two),
         }
     }
 }
