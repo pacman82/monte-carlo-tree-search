@@ -24,13 +24,18 @@ fn play_tic_tac_toe() {
 }
 
 #[test]
+#[ignore = "Long time to compute"]
 #[should_panic] // Driving test not implemented yet
 fn solve_tic_tac_toe() {
     let mut rng = StdRng::seed_from_u64(42);
     let game = TicTacToe::new();
 
-    let num_playouts = 1_000;
+    // 362_880 is faculty 9, so it should be an upper bound for the number of playouts needed to
+    // solve the game.
+    let num_playouts =362_880;
     let tree = Tree::with_playouts(game, num_playouts, &mut rng);
+    eprintln!("nodes: {} links: {}", tree.num_nodes(), tree.num_links());
+    print_move_statistics(&tree);
 
     assert_eq!(Evaluation::Draw, tree.evaluation());
 }
