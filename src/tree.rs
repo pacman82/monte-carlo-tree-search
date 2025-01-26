@@ -40,44 +40,52 @@ where
             .unwrap_or_default();
         let root = Node::new(usize::MAX, 0, move_buf.len(), estimated_outcome);
         let nodes = vec![root];
-        let links = move_buf
+        let links: Vec<_> = move_buf
             .drain(..)
             .map(|move_| Link {
                 child: usize::MAX,
                 move_,
             })
             .collect();
+        // Choose the first move as the best move to start, only so, that if [`Self::best_move`] is
+        // called, before the first playout, it will return a move and not `None`.
+        let best_link = if links.is_empty() { None } else { Some(0) };
         Self {
             game,
             nodes,
             links,
             move_buf,
-            best_link: None,
+            best_link,
         }
     }
 
     pub fn with_playouts(game: G, num_playouts: u32, rng: &mut impl Rng) -> Self {
         let mut tree = Self::new(game);
         for _ in 0..num_playouts {
-            tree.playout(rng);
+            if !tree.playout(rng) {
+                break;
+            }
         }
         tree
     }
 
-    /// Playout one cycle of selection, expansion, simulation and backpropagation.
-    pub fn playout(&mut self, rng: &mut impl Rng) {
-        let (leaf_index, mut game) = self.select_leaf_for_exploration();
-        // expanded_index might be leaf_index, usually it will be a new child node though, in case
-        // leaf is not a terminal state
-        let expanded_index = self.expand(leaf_index, &mut game, rng);
+    /// Playout one cycle of selection, expansion, simulation and backpropagation. `true` if the
+    /// playout may have changed the evaluation of the root, `false` if the game is already solved.
+    pub fn playout(&mut self, rng: &mut impl Rng) -> bool {
+        let Some((to_be_expanded_index, mut game)) = self.select_unexplored_node() else {
+            return false;
+        };
+        // Create a new child node for the selected node and let `game` represent its state
+        let new_node_index = self.expand(to_be_expanded_index, &mut game, rng);
         // Player whom gets to choose the next turn in the board the (new) leaf node represents.
         let player = game.current_player();
         self.backpropagation(
-            expanded_index,
-            self.nodes[expanded_index].evaluation,
+            new_node_index,
+            self.nodes[new_node_index].evaluation,
             player,
         );
         self.update_best_link();
+        true
     }
 
     /// Count of playouts of the root node.
@@ -145,18 +153,24 @@ where
         }
     }
 
-    /// Selects a leaf of the tree for exploration. The selected leaf is not solved yet. I.e. we
-    /// do not know the outcome of the game from the leaf or any of its parents given perfect play.
+    /// Selects a node of the tree of which is not solved (yet?). This means we do not know given
+    /// perfect play, if the game would result in win, loose or draw starting from the nodes
+    /// position. Since the resulting node is unsolved. In addition to being unsolved, we also
+    /// demand that the node is unexplored, i.e. it has at least one link, which is not yet directed
+    /// at a node. As such the node returned by this method is suitable for expansion.
     ///
     /// # Return
     ///
     /// Index of the selected leaf node and the game state of the node.
-    fn select_leaf_for_exploration(&self) -> (usize, G) {
+    fn select_unexplored_node(&self) -> Option<(usize, G)> {
         let mut current_node_index = 0;
         let mut game = self.game.clone();
-        while !self.is_leaf(current_node_index) {
-            let best_ucb = self
+        while !self.has_unexplored_children(current_node_index) {
+            let Some(best_ucb) = self
                 .child_links(current_node_index)
+                // Filter all solved positions. We may assume link is explored, because of the
+                // entry condition of the while loop
+                .filter(|link| !self.nodes[link.child].evaluation.is_solved())
                 .max_by(|a, b| {
                     let a = self.nodes[a.child].evaluation.selection_weight(
                         self.nodes[current_node_index].evaluation.total() as f32,
@@ -168,59 +182,66 @@ where
                     );
                     a.partial_cmp(&b).unwrap()
                 })
-                .expect("Children must not be empty");
+            else {
+                // We should never decent into a solved node. Any unsolved node should have at least
+                // one unsolved child, otherwise, would it not have been solved during
+                // backpropagation?
+                debug_assert_eq!(current_node_index, 0);
+                return None;
+            };
             game.play(&best_ucb.move_);
             current_node_index = best_ucb.child;
         }
-        (current_node_index, game)
+        Some((current_node_index, game))
     }
 
-    /// Expand an unexplored child of the selected node. Mutates `game` to represent expanded child.
+    /// Expand an unexplored child of the selected node. Mutates `game` to represent state of the
+    /// node indicated by the retunned index.
     ///
     /// # Return
     ///
     /// Index of newly created child node.
-    fn expand(&mut self, selected_node_index: usize, game: &mut G, rng: &mut impl Rng) -> usize {
-        let selected_node = &self.nodes[selected_node_index];
-        let children = &mut self.links[selected_node.children_begin..selected_node.children_end];
-        let mut candidates: Vec<_> = children
+    fn expand(&mut self, to_be_expanded_index: usize, game: &mut G, rng: &mut impl Rng) -> usize {
+        let to_be_expanded_node = &self.nodes[to_be_expanded_index];
+        let child_links =
+            &mut self.links[to_be_expanded_node.children_begin..to_be_expanded_node.children_end];
+        // We should avoid the allocation of a vector here, for now I let it stand.
+        let mut candidates: Vec<_> = child_links
             .iter_mut()
             .filter(|link| !link.is_explored())
             .collect();
-        if let Some(link) = candidates.choose_mut(rng) {
-            game.play(&link.move_);
-            let new_node_game_state = game.state(&mut self.move_buf);
-            // Index there new node is created
-            let new_node_index = self.nodes.len();
-            link.child = new_node_index;
-            let grandchildren_begin = self.links.len();
-            let grandchildren_end = grandchildren_begin + new_node_game_state.moves().len();
-            let maybe_solved_outcome = new_node_game_state.map_terminal_to_evaluation();
-            self.links.extend(self.move_buf.drain(..).map(|move_| Link {
-                child: usize::MAX,
-                move_,
-            }));
+        let link = candidates
+            .choose_mut(rng)
+            .expect("To be expandend node must have unexplored children");
 
-            // If not solved yet we simulate an outcome
-            let estimated_outcome = maybe_solved_outcome
-                // **Be careful**: move_buf will be cleared by simulation, so we should have used
-                // all relevant information from it before calling simulation.
-                .unwrap_or_else(|| {
-                    Evaluation::Undecided(simulation(game.clone(), &mut self.move_buf, rng))
-                });
+        game.play(&link.move_);
+        let new_node_game_state = game.state(&mut self.move_buf);
+        // Index there new node is created
+        let new_node_index = self.nodes.len();
+        link.child = new_node_index;
+        let grandchildren_begin = self.links.len();
+        let grandchildren_end = grandchildren_begin + new_node_game_state.moves().len();
+        let maybe_solved_outcome = new_node_game_state.map_terminal_to_evaluation();
+        self.links.extend(self.move_buf.drain(..).map(|move_| Link {
+            child: usize::MAX,
+            move_,
+        }));
 
-            self.nodes.push(Node::new(
-                selected_node_index,
-                grandchildren_begin,
-                grandchildren_end,
-                estimated_outcome,
-            ));
-            new_node_index
-        } else {
-            // Selected child has no unexplored children => since it is a leaf, it must be in a
-            // terminal state
-            selected_node_index
-        }
+        // If not solved yet we simulate an outcome
+        let estimated_outcome = maybe_solved_outcome
+            // **Be careful**: move_buf will be cleared by simulation, so we should have used
+            // all relevant information from it before calling simulation.
+            .unwrap_or_else(|| {
+                Evaluation::Undecided(simulation(game.clone(), &mut self.move_buf, rng))
+            });
+
+        self.nodes.push(Node::new(
+            to_be_expanded_index,
+            grandchildren_begin,
+            grandchildren_end,
+            estimated_outcome,
+        ));
+        new_node_index
     }
 
     fn backpropagation(&mut self, node_index: usize, mut delta: Evaluation, mut player: Player) {
@@ -228,8 +249,6 @@ where
         while let Some(current_node_index) = current {
             player.flip();
 
-            // **Bug**: We can not use count indiscriminately here, we must turn a deterministic
-            // win into an add, in order to not be to deterministic in our backpropagation.
             let (updated_evaluation, new_delta) =
                 self.updated_evaluation(current_node_index, delta, player);
             delta = new_delta;
@@ -257,22 +276,21 @@ where
             return (propagated_evaluation, propagated_evaluation);
         }
         // If the choosing player is not guaranteed to win let's check if there is a draw or a loss
+        let loss = Evaluation::Win(choosing_player.other());
         if propagated_evaluation.is_solved() {
-            let mut acc = Some(Evaluation::Win(choosing_player.other()));
+            let mut acc = Some(loss);
             for link in self.child_links(node_index) {
                 if !link.is_explored() {
                     // Found unexplored node, so we can not be sure its a draw or loss
                     acc = None;
                     break;
                 }
-                if self.nodes[link.child].evaluation == Evaluation::Draw {
+                let child_eval = self.nodes[link.child].evaluation;
+                if child_eval == Evaluation::Draw {
                     // Found a draw, so we can be sure its not a loss
                     acc = Some(Evaluation::Draw);
-                } else if self.nodes[link.child].evaluation
-                    != Evaluation::Win(choosing_player.other())
-                {
-                    // Found a child neither draw or loss, so we can not make a statement about the
-                    // parent.
+                } else if child_eval != loss {
+                    // Found a child neither draw or loss, so we can not rule out a victory yet
                     acc = None;
                     break;
                 }
@@ -296,12 +314,9 @@ where
         }
     }
 
-    /// A leaf is any node with no children or unexplored children
-    fn is_leaf(&self, node_index: usize) -> bool {
+    /// `true` if the node has at least one child which is not explored yet.
+    fn has_unexplored_children(&self, node_index: usize) -> bool {
         let mut it = self.child_links(node_index);
-        if it.len() == 0 {
-            return true;
-        }
         it.any(|link| !link.is_explored())
     }
 

@@ -24,15 +24,31 @@ fn play_tic_tac_toe() {
 }
 
 #[test]
-#[ignore = "Long time to compute"]
-#[should_panic] // Driving test not implemented yet
+fn backpropagation_of_draw() {
+    let mut rng = StdRng::seed_from_u64(42);
+    let mut game = TicTacToe::new();
+    game.play_move(&CellIndex::new(4));
+    game.play_move(&CellIndex::new(2));
+
+    let num_playouts = 1_000;
+
+    let tree = Tree::with_playouts(game, num_playouts, &mut rng);
+    let best_move = tree.best_move().unwrap();
+    game.play_move(&best_move);
+
+    print_move_statistics(&tree);
+    assert_eq!(Evaluation::Draw, tree.evaluation());
+}
+
+#[test]
 fn solve_tic_tac_toe() {
     let mut rng = StdRng::seed_from_u64(42);
     let game = TicTacToe::new();
 
     // 362_880 is faculty 9, so it should be an upper bound for the number of playouts needed to
-    // solve the game.
-    let num_playouts =362_880;
+    // solve the game. In actuality, we are likely to solve it with fewer playouts, as will be
+    // indicated by the number of nodes in the tree.
+    let num_playouts = 362_880;
     let tree = Tree::with_playouts(game, num_playouts, &mut rng);
     eprintln!("nodes: {} links: {}", tree.num_nodes(), tree.num_links());
     print_move_statistics(&tree);
@@ -56,7 +72,7 @@ fn prevent_immediate_win_of_player_two() {
     game.play_move(&CellIndex::new(6));
     game.play_move(&CellIndex::new(2));
     game.play_move(&CellIndex::new(8));
-    
+
     // use std::io::stderr;
     // game.print_to(stderr()).unwrap();
 
@@ -82,7 +98,7 @@ fn prevent_immediate_win_of_player_one() {
     game.play_move(&CellIndex::new(2));
     game.play_move(&CellIndex::new(8));
     game.play_move(&CellIndex::new(7));
-    
+
     // use std::io::stderr;
     // game.print_to(stderr()).unwrap();
 
@@ -95,11 +111,7 @@ fn prevent_immediate_win_of_player_one() {
 fn print_move_statistics(tree: &Tree<TicTacToe>) {
     let evals = tree.eval_by_move().collect::<Vec<_>>();
     for (mv, eval) in evals {
-        eprintln!(
-            "Move: {:?} Count: {:?}",
-            mv,
-            eval,
-        );
+        eprintln!("Move: {:?} Count: {:?}", mv, eval,);
     }
 }
 
@@ -304,7 +316,7 @@ fn unexplored_root_childs() {
 
     assert!(tree.best_move().is_some());
     // Just iterate to see that we do not panic in case child is unexplored
-    assert_eq!(9,tree.eval_by_move().count());
+    assert_eq!(9, tree.eval_by_move().count());
 }
 
 /// Strict alias, so we can implement trait for type
@@ -353,10 +365,10 @@ impl TwoPlayerGame for TicTacToe {
 
     fn current_player(&self) -> Player {
         match self.0.state() {
-            TicTacToeState::TurnPlayerOne
-            | TicTacToeState::VictoryPlayerTwo
-            | TicTacToeState::Draw => Player::One,
-            TicTacToeState::TurnPlayerTwo | TicTacToeState::VictoryPlayerOne => Player::Two,
+            TicTacToeState::TurnPlayerOne | TicTacToeState::VictoryPlayerTwo => Player::One,
+            TicTacToeState::TurnPlayerTwo
+            | TicTacToeState::VictoryPlayerOne
+            | TicTacToeState::Draw => Player::Two,
         }
     }
 }
