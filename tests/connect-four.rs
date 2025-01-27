@@ -82,7 +82,7 @@ fn position_42442445555772222514171() {
 
 #[test]
 #[ignore = "Computes a long time. More a design exploration, than an actual test"]
-fn play_against_perfect_solver_as_player_one() {
+fn beat_perfect_solver_as_player_one() {
     let mut rng = StdRng::seed_from_u64(42);
 
     let mut game = ConnectFour::new();
@@ -140,6 +140,19 @@ fn play_against_yourself() {
         eprintln!("{game}");
     }
     eprint!("History: {}", String::from_utf8(history).unwrap());
+}
+
+#[test]
+#[should_panic]
+#[ignore = "Not powerful enough to solve the game, yet. Takes a long time."]
+fn solve_connect_four() {
+    let mut rng = StdRng::seed_from_u64(42);
+    let game = ConnectFour::new();
+    let num_playouts = 100_000_000;
+
+    let tree = Tree::with_playouts(game, ConnectFourBias, num_playouts, &mut rng);
+
+    assert_eq!(Evaluation::Win(Player::One), tree.evaluation());
 }
 
 fn print_move_statistics<B>(tree: &Tree<ConnectFour, B>) {
