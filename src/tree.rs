@@ -2,9 +2,9 @@ use std::cmp::Ordering;
 
 use rand::{seq::SliceRandom as _, Rng};
 
-use crate::{evaluation::Evaluation, simulation, Count, Player, TwoPlayerGame};
+use crate::{evaluation::Evaluation, Bias, Count, Player, TwoPlayerGame};
 
-pub struct Tree<G: TwoPlayerGame> {
+pub struct Tree<G: TwoPlayerGame, B> {
     /// Game state of the root node.
     game: G,
     /// We store all the nodes of the tree in a vector to avoid allocations. We refer to the nodes
@@ -29,17 +29,18 @@ pub struct Tree<G: TwoPlayerGame> {
     /// we would take the longest to realize it is a loose, is likely the one which allows the
     /// opponent to make the most mistakes.
     best_link: Option<usize>,
+    /// Used to get an initial estimate of the outcome of a new node.
+    bias: B,
 }
 
-impl<G> Tree<G>
+impl<G, B> Tree<G, B>
 where
     G: TwoPlayerGame,
+    B: Bias<G>,
 {
-    pub fn new(game: G) -> Self {
+    pub fn new(game: G, bias: B) -> Self {
         let mut move_buf = Vec::new();
-        let estimated_outcome = game
-            .state(&mut move_buf)
-            .map_to_evaluation();
+        let estimated_outcome = game.state(&mut move_buf).map_to_evaluation();
         let root = Node::new(usize::MAX, 0, move_buf.len(), estimated_outcome);
         let nodes = vec![root];
         let links: Vec<_> = move_buf
@@ -59,11 +60,12 @@ where
             move_buf,
             candidate_link_index_buf: Vec::new(),
             best_link,
+            bias,
         }
     }
 
-    pub fn with_playouts(game: G, num_playouts: u32, rng: &mut impl Rng) -> Self {
-        let mut tree = Self::new(game);
+    pub fn with_playouts(game: G, bias: B, num_playouts: u32, rng: &mut impl Rng) -> Self {
+        let mut tree = Self::new(game, bias);
         for _ in 0..num_playouts {
             if !tree.playout(rng) {
                 break;
@@ -86,53 +88,13 @@ where
 
         // If the game is not in a terminal state, start a simulation to gain an initial estimate
         if !self.nodes[new_node_index].evaluation.is_solved() {
-            let count = simulation(game, &mut self.move_buf, rng);
-            self.nodes[new_node_index].evaluation = Evaluation::Undecided(count);
+            let bias = self.bias.bias(game, &mut self.move_buf, rng);
+            self.nodes[new_node_index].evaluation = bias;
         }
 
-        self.backpropagation(
-            new_node_index,
-            player,
-        );
+        self.backpropagation(new_node_index, player);
         self.update_best_link();
         true
-    }
-
-    /// Count of playouts of the root node.
-    pub fn evaluation(&self) -> Evaluation {
-        self.nodes[0].evaluation
-    }
-
-    pub fn eval_by_move(&self) -> impl Iterator<Item = (G::Move, Evaluation)> + '_ {
-        let root = &self.nodes[0];
-        self.links[root.children_begin..root.children_end]
-            .iter()
-            .map(move |link| {
-                if link.is_explored() {
-                    let child = &self.nodes[link.child];
-                    (link.move_, child.evaluation)
-                } else {
-                    (link.move_, Evaluation::default())
-                }
-            })
-    }
-
-    /// Picks one of the best movesfor the current player. `None` if the root node has no children.
-    pub fn best_move(&self) -> Option<G::Move> {
-        self.best_link
-            .map(|link_index| self.links[link_index].move_)
-    }
-
-    pub fn num_nodes(&self) -> usize {
-        self.nodes.len()
-    }
-
-    pub fn num_links(&self) -> usize {
-        self.links.len()
-    }
-
-    pub fn game(&self) -> &G {
-        &self.game
     }
 
     fn update_best_link(&mut self) {
@@ -256,7 +218,7 @@ where
         let mut current = self.nodes[node_index].parent_index();
         // Total of child node before propagation. The original node index is the newly added leaf
         // so we can assume it to be 1. We keep track of this value going upwards, in case an
-        // a solved node flips to an undecided node, to count all previous visits to the solved 
+        // a solved node flips to an undecided node, to count all previous visits to the solved
         // child node as one the analogos of the solved state.
         let mut child_count = delta.into_count();
         while let Some(current_node_index) = current {
@@ -339,7 +301,7 @@ where
                 };
                 count -= previous_child_count;
                 count
-            },
+            }
             Evaluation::Undecided(count) => count,
         };
 
@@ -366,6 +328,48 @@ where
         self.links[node.children_begin..node.children_end]
             .iter()
             .copied()
+    }
+}
+
+impl<G, B> Tree<G, B>
+where
+    G: TwoPlayerGame,
+{
+    /// Count of playouts of the root node.
+    pub fn evaluation(&self) -> Evaluation {
+        self.nodes[0].evaluation
+    }
+
+    pub fn eval_by_move(&self) -> impl Iterator<Item = (G::Move, Evaluation)> + '_ {
+        let root = &self.nodes[0];
+        self.links[root.children_begin..root.children_end]
+            .iter()
+            .map(move |link| {
+                if link.is_explored() {
+                    let child = &self.nodes[link.child];
+                    (link.move_, child.evaluation)
+                } else {
+                    (link.move_, Evaluation::default())
+                }
+            })
+    }
+
+    /// Picks one of the best movesfor the current player. `None` if the root node has no children.
+    pub fn best_move(&self) -> Option<G::Move> {
+        self.best_link
+            .map(|link_index| self.links[link_index].move_)
+    }
+
+    pub fn num_nodes(&self) -> usize {
+        self.nodes.len()
+    }
+
+    pub fn num_links(&self) -> usize {
+        self.links.len()
+    }
+
+    pub fn game(&self) -> &G {
+        &self.game
     }
 }
 

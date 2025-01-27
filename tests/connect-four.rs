@@ -4,7 +4,9 @@ use std::{
 };
 
 use connect_four_solver::{Column, Solver};
-use monte_carlo_tree_search::{Evaluation, GameState, Player, Tree, TwoPlayerGame};
+use monte_carlo_tree_search::{
+    Evaluation, GameState, Player, RandomPlayoutBias, Tree, TwoPlayerGame,
+};
 use rand::{rngs::StdRng, seq::SliceRandom, SeedableRng};
 
 #[test]
@@ -13,7 +15,7 @@ fn play_move_connect_four() {
     let game = ConnectFour::new();
     let num_playouts = 100;
 
-    let tree = Tree::with_playouts(game, num_playouts, &mut rng);
+    let tree = Tree::with_playouts(game, RandomPlayoutBias, num_playouts, &mut rng);
 
     for (move_, eval) in tree.eval_by_move() {
         eprintln!("Eval child {:?}: {:?} ", move_, eval,);
@@ -24,7 +26,7 @@ fn play_move_connect_four() {
 fn start_from_terminal_position() {
     // First player has won
     let game = ConnectFour::from_move_list("1212121");
-    let tree = Tree::new(game);
+    let tree = Tree::new(game, RandomPlayoutBias);
 
     assert_eq!(Evaluation::Win(Player::One), tree.evaluation());
 }
@@ -46,7 +48,7 @@ fn position_424424455557722225141717() {
 
     let mut rng = StdRng::seed_from_u64(42);
     let num_playouts = 1_000;
-    let tree = Tree::with_playouts(game, num_playouts, &mut rng);
+    let tree = Tree::with_playouts(game, RandomPlayoutBias, num_playouts, &mut rng);
     print_move_statistics(&tree);
     assert_eq!(Column::from_index(0), tree.best_move().unwrap());
 }
@@ -70,7 +72,7 @@ fn position_42442445555772222514171() {
     let mut rng = StdRng::seed_from_u64(42);
     // 1000 playouts are not enough to prove every move is a loss for `O`.
     let num_playouts = 1000;
-    let tree = Tree::with_playouts(game, num_playouts, &mut rng);
+    let tree = Tree::with_playouts(game, RandomPlayoutBias, num_playouts, &mut rng);
     print_move_statistics(&tree);
     assert!(tree
         .eval_by_move()
@@ -90,7 +92,8 @@ fn play_against_perfect_solver_as_player_one() {
     while !game.is_over() {
         let next_move = if game.stones() % 2 == 0 {
             let num_playouts = 1_000;
-            let tree = Tree::with_playouts(ConnectFour(game), num_playouts, &mut rng);
+            let tree =
+                Tree::with_playouts(ConnectFour(game), RandomPlayoutBias, num_playouts, &mut rng);
             eprintln!("nodes: {} links: {}", tree.num_nodes(), tree.num_links());
             print_move_statistics(&tree);
             tree.best_move().unwrap()
@@ -121,7 +124,8 @@ fn play_against_yourself() {
         } else {
             num_playouts_player_two
         };
-        let tree = Tree::with_playouts(ConnectFour(game), num_playouts, &mut rng);
+        let tree =
+            Tree::with_playouts(ConnectFour(game), RandomPlayoutBias, num_playouts, &mut rng);
         eprintln!("nodes: {} links: {}", tree.num_nodes(), tree.num_links());
         let next_move = tree.best_move().unwrap();
         eprintln!("column: {next_move}");
@@ -132,7 +136,7 @@ fn play_against_yourself() {
     eprint!("History: {}", String::from_utf8(history).unwrap());
 }
 
-fn print_move_statistics(tree: &Tree<ConnectFour>) {
+fn print_move_statistics<B>(tree: &Tree<ConnectFour, B>) {
     let evals = tree.eval_by_move().collect::<Vec<_>>();
     for (mv, eval) in evals {
         eprintln!("Move: {:?} Eval: {:?}", mv, eval,);

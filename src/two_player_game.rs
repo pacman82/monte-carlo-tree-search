@@ -44,7 +44,7 @@ impl<M> GameState<'_, M> {
         }
     }
 
-    pub (crate) fn map_to_evaluation(&self) -> Evaluation {
+    pub(crate) fn map_to_evaluation(&self) -> Evaluation {
         match self {
             GameState::Moves(_) => Evaluation::Undecided(Count::default()),
             GameState::Draw => Evaluation::Draw,

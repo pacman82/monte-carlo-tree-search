@@ -1,4 +1,7 @@
-use std::{cmp::Ordering, ops::{AddAssign, SubAssign}};
+use std::{
+    cmp::Ordering,
+    ops::{AddAssign, SubAssign},
+};
 
 use crate::Player;
 
@@ -11,7 +14,6 @@ pub enum Evaluation {
 }
 
 impl Evaluation {
-
     /// Compare two evaluations from the perspective of the given player. Ordering is such that the
     /// greater argument is more favorable for the player.
     pub fn cmp_for(&self, other: &Evaluation, player: Player) -> Ordering {
@@ -46,7 +48,7 @@ impl Evaluation {
             (Evaluation::Undecided(c1), Evaluation::Undecided(c2)) => {
                 c1.reward(player).partial_cmp(&c2.reward(player)).unwrap()
             }
-            (a, b) => b.cmp_for(a, player).reverse()
+            (a, b) => b.cmp_for(a, player).reverse(),
         }
     }
 
@@ -184,18 +186,69 @@ mod test {
         let one = Player::One;
         let two = Player::Two;
 
-        assert_eq!(win_player_one.cmp_for(&win_player_one, one), Ordering::Equal);
-        assert_eq!(win_player_one.cmp_for(&win_player_two, one), Ordering::Greater);
+        assert_eq!(
+            win_player_one.cmp_for(&win_player_one, one),
+            Ordering::Equal
+        );
+        assert_eq!(
+            win_player_one.cmp_for(&win_player_two, one),
+            Ordering::Greater
+        );
         assert_eq!(win_player_one.cmp_for(&win_player_two, two), Ordering::Less);
         assert_eq!(win_player_one.cmp_for(&draw, one), Ordering::Greater);
         assert_eq!(win_player_one.cmp_for(&draw, two), Ordering::Less);
         assert_eq!(draw.cmp_for(&win_player_one, one), Ordering::Less);
         assert_eq!(draw.cmp_for(&win_player_two, one), Ordering::Greater);
         assert_eq!(draw.cmp_for(&draw, one), Ordering::Equal);
-        assert_eq!(draw.cmp_for(&Evaluation::Undecided(Count { draws: 1, ..Count::default()}), one), Ordering::Equal);
-        assert_eq!(draw.cmp_for(&Evaluation::Undecided(Count { wins_player_one: 1, ..Count::default()}), one), Ordering::Less);
-        assert_eq!(Evaluation::Undecided(Count { wins_player_one: 1, ..Count::default() }).cmp_for(&win_player_one, one), Ordering::Less);
-        assert_eq!(Evaluation::Undecided(Count { wins_player_two: 1, ..Count::default() }).cmp_for(&win_player_two, one), Ordering::Greater);
-        assert_eq!(Evaluation::Undecided(Count { wins_player_one: 1, ..Count::default() }).cmp_for(&Evaluation::Undecided(Count { wins_player_two: 1, ..Count::default()}), one), Ordering::Greater);
+        assert_eq!(
+            draw.cmp_for(
+                &Evaluation::Undecided(Count {
+                    draws: 1,
+                    ..Count::default()
+                }),
+                one
+            ),
+            Ordering::Equal
+        );
+        assert_eq!(
+            draw.cmp_for(
+                &Evaluation::Undecided(Count {
+                    wins_player_one: 1,
+                    ..Count::default()
+                }),
+                one
+            ),
+            Ordering::Less
+        );
+        assert_eq!(
+            Evaluation::Undecided(Count {
+                wins_player_one: 1,
+                ..Count::default()
+            })
+            .cmp_for(&win_player_one, one),
+            Ordering::Less
+        );
+        assert_eq!(
+            Evaluation::Undecided(Count {
+                wins_player_two: 1,
+                ..Count::default()
+            })
+            .cmp_for(&win_player_two, one),
+            Ordering::Greater
+        );
+        assert_eq!(
+            Evaluation::Undecided(Count {
+                wins_player_one: 1,
+                ..Count::default()
+            })
+            .cmp_for(
+                &Evaluation::Undecided(Count {
+                    wins_player_two: 1,
+                    ..Count::default()
+                }),
+                one
+            ),
+            Ordering::Greater
+        );
     }
 }
