@@ -85,29 +85,33 @@ fn position_42442445555772222514171() {
 fn play_against_perfect_solver_as_player_one() {
     let mut rng = StdRng::seed_from_u64(42);
 
-    let mut game = connect_four_solver::ConnectFour::new();
+    let mut game = ConnectFour::new();
     let mut solver = Solver::new();
     let mut moves = Vec::new();
 
-    while !game.is_over() {
-        let next_move = if game.stones() % 2 == 0 {
-            let num_playouts = 20_000;
-            let tree =
-                Tree::with_playouts(ConnectFour(game), ConnectFourBias, num_playouts, &mut rng);
-            eprintln!("nodes: {} links: {}", tree.num_nodes(), tree.num_links());
-            print_move_statistics(&tree);
-            tree.best_move().unwrap()
-        } else {
-            solver.best_moves(&game, &mut moves);
-            *moves.choose(&mut rng).unwrap()
+    while !game.0.is_over() {
+        let next_move = match game.current_player() {
+            Player::One => {
+                let num_playouts = 20_000;
+                let tree = Tree::with_playouts(game, ConnectFourBias, num_playouts, &mut rng);
+                eprintln!("nodes: {} links: {}", tree.num_nodes(), tree.num_links());
+                print_move_statistics(&tree);
+                tree.best_move().unwrap()
+            }
+            Player::Two => {
+                solver.best_moves(&game.0, &mut moves);
+                *moves.choose(&mut rng).unwrap()
+            }
         };
         eprintln!("column: {next_move}");
-        game.play(next_move);
+        game.play(&next_move);
         eprintln!("{game}");
     }
+
+    assert!(game.0.is_victory());
+    assert_eq!(game.current_player(), Player::Two);
 }
 
-// So far it is not clear that using the stronger `ConnectFourBias`, actually yields better results.
 #[test]
 #[ignore = "Computes a long time. More a design exploration, than an actual test"]
 fn play_against_yourself() {
