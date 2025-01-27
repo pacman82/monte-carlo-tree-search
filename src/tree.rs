@@ -92,7 +92,6 @@ where
 
         self.backpropagation(
             new_node_index,
-            self.nodes[new_node_index].evaluation,
             player,
         );
         self.update_best_link();
@@ -252,7 +251,8 @@ where
         new_node_index
     }
 
-    fn backpropagation(&mut self, node_index: usize, mut delta: Evaluation, mut player: Player) {
+    fn backpropagation(&mut self, node_index: usize, mut player: Player) {
+        let mut delta = self.nodes[node_index].evaluation;
         let mut current = self.nodes[node_index].parent_index();
         while let Some(current_node_index) = current {
             player.flip();
