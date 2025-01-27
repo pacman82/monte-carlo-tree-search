@@ -8,11 +8,11 @@ pub enum Player {
 impl Player {
     /// Turn player [`Player::One`] into [`Player::Two`] and vice versa.
     pub fn flip(&mut self) {
-        *self = self.other();
+        *self = self.opponent();
     }
 
     /// Yield the other player.
-    pub fn other(&self) -> Player {
+    pub fn opponent(&self) -> Player {
         match self {
             Player::One => Player::Two,
             Player::Two => Player::One,

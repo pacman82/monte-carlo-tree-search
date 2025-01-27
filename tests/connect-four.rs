@@ -91,7 +91,7 @@ fn play_against_perfect_solver_as_player_one() {
 
     while !game.is_over() {
         let next_move = if game.stones() % 2 == 0 {
-            let num_playouts = 100_000_000;
+            let num_playouts = 20_000;
             let tree =
                 Tree::with_playouts(ConnectFour(game), ConnectFourBias, num_playouts, &mut rng);
             eprintln!("nodes: {} links: {}", tree.num_nodes(), tree.num_links());
@@ -111,7 +111,7 @@ fn play_against_perfect_solver_as_player_one() {
 #[test]
 #[ignore = "Computes a long time. More a design exploration, than an actual test"]
 fn play_against_yourself() {
-    let mut rng = StdRng::seed_from_u64(0);
+    let mut rng = StdRng::seed_from_u64(5);
     let mut game = connect_four_solver::ConnectFour::new();
 
     let mut history = Vec::new();
@@ -121,13 +121,13 @@ fn play_against_yourself() {
             // Player One
             eprintln!("Player One");
             let bias = ConnectFourBias;
-            let num_playouts = 10_000;
+            let num_playouts = 100_000;
             use_tree_to_generate_move(game, num_playouts, bias, &mut rng)
         } else {
             // Player Two
             eprintln!("Player Two");
             let bias = RandomPlayoutBias;
-            let num_playouts = 10_000;
+            let num_playouts = 100_000;
             use_tree_to_generate_move(game, num_playouts, bias, &mut rng)
         };
         eprintln!("column: {next_move}");
@@ -219,23 +219,14 @@ impl Bias<ConnectFour> for ConnectFourBias {
         if game.0.can_win_in_next_move() {
             return Evaluation::Win(game.current_player());
         }
+        if game.0.non_loosing_moves().next().is_none() {
+            return Evaluation::Win(game.current_player().opponent());
+        }
         loop {
             match game.state(move_buf) {
-                GameState::Moves(moves) => {
-                    let next_move = *moves.choose(rng).unwrap();
-                    game.play(&next_move);
-                }
-                GameState::WinPlayerOne => {
-                    return Evaluation::Undecided(Count {
-                        wins_player_one: 1,
-                        ..Count::default()
-                    })
-                }
-                GameState::WinPlayerTwo => {
-                    return Evaluation::Undecided(Count {
-                        wins_player_two: 1,
-                        ..Count::default()
-                    })
+                GameState::Moves(_moves) => (),
+                GameState::WinPlayerOne | GameState::WinPlayerTwo => {
+                    unreachable!("Should have detected winning move beforehand")
                 }
                 GameState::Draw => {
                     return Evaluation::Undecided(Count {
@@ -243,6 +234,21 @@ impl Bias<ConnectFour> for ConnectFourBias {
                         ..Count::default()
                     })
                 }
+            }
+            if game.0.can_win_in_next_move() {
+                let mut count = Count::default();
+                count.report_win_for(game.current_player());
+                return Evaluation::Undecided(count);
+            }
+            move_buf.clear();
+            move_buf.extend(game.0.non_loosing_moves());
+            if let Some(next_move) = move_buf.choose(rng) {
+                game.play(next_move);
+            } else {
+                // No move available which would not allow our opponent to win, so we loose.
+                let mut count = Count::default();
+                count.report_win_for(game.current_player().opponent());
+                return Evaluation::Undecided(count);
             }
         }
     }

@@ -253,7 +253,7 @@ where
             return (propagated_evaluation, propagated_evaluation);
         }
         // If the choosing player is not guaranteed to win let's check if there is a draw or a loss
-        let loss = Evaluation::Win(choosing_player.other());
+        let loss = Evaluation::Win(choosing_player.opponent());
         if propagated_evaluation.is_solved() {
             let mut acc = Some(loss);
             for link in self.child_links(node_index) {
