@@ -1,6 +1,5 @@
-use rand::{seq::SliceRandom as _, Rng};
-
 use crate::{Count, GameState, TwoPlayerGame};
+use rand::{seq::IndexedRandom as _, Rng};
 
 /// Play random moves, until the game is over and report the score from the perspective of the
 /// player whose turn it is.

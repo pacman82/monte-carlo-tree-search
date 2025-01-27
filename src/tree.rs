@@ -1,6 +1,6 @@
 use std::cmp::Ordering;
 
-use rand::{seq::SliceRandom as _, Rng};
+use rand::{seq::IndexedRandom as _, Rng};
 
 use crate::{evaluation::Evaluation, Bias, Count, Player, TwoPlayerGame};
 

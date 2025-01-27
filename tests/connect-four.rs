@@ -5,9 +5,9 @@ use std::{
 
 use connect_four_solver::{Column, Solver};
 use monte_carlo_tree_search::{
-    Evaluation, GameState, Player, RandomPlayoutBias, Tree, TwoPlayerGame,
+    Bias, Count, Evaluation, GameState, Player, RandomPlayoutBias, Tree, TwoPlayerGame,
 };
-use rand::{rngs::StdRng, seq::SliceRandom, SeedableRng};
+use rand::{rngs::StdRng, seq::IndexedRandom as _, Rng, SeedableRng};
 
 #[test]
 fn play_move_connect_four() {
@@ -91,9 +91,9 @@ fn play_against_perfect_solver_as_player_one() {
 
     while !game.is_over() {
         let next_move = if game.stones() % 2 == 0 {
-            let num_playouts = 1_000;
+            let num_playouts = 100_000_000;
             let tree =
-                Tree::with_playouts(ConnectFour(game), RandomPlayoutBias, num_playouts, &mut rng);
+                Tree::with_playouts(ConnectFour(game), ConnectFourBias, num_playouts, &mut rng);
             eprintln!("nodes: {} links: {}", tree.num_nodes(), tree.num_links());
             print_move_statistics(&tree);
             tree.best_move().unwrap()
@@ -107,27 +107,29 @@ fn play_against_perfect_solver_as_player_one() {
     }
 }
 
+// So far it is not clear that using the stronger `ConnectFourBias`, actually yields better results.
 #[test]
 #[ignore = "Computes a long time. More a design exploration, than an actual test"]
 fn play_against_yourself() {
-    let mut rng = StdRng::seed_from_u64(42);
-
+    let mut rng = StdRng::seed_from_u64(0);
     let mut game = connect_four_solver::ConnectFour::new();
 
-    let num_playouts_player_one = 10_000;
-    let num_playouts_player_two = 1_000;
     let mut history = Vec::new();
 
     while !game.is_over() {
-        let num_playouts = if game.stones() % 2 == 0 {
-            num_playouts_player_one
+        let next_move = if game.stones() % 2 == 0 {
+            // Player One
+            eprintln!("Player One");
+            let bias = ConnectFourBias;
+            let num_playouts = 10_000;
+            use_tree_to_generate_move(game, num_playouts, bias, &mut rng)
         } else {
-            num_playouts_player_two
+            // Player Two
+            eprintln!("Player Two");
+            let bias = RandomPlayoutBias;
+            let num_playouts = 10_000;
+            use_tree_to_generate_move(game, num_playouts, bias, &mut rng)
         };
-        let tree =
-            Tree::with_playouts(ConnectFour(game), RandomPlayoutBias, num_playouts, &mut rng);
-        eprintln!("nodes: {} links: {}", tree.num_nodes(), tree.num_links());
-        let next_move = tree.best_move().unwrap();
         eprintln!("column: {next_move}");
         write!(&mut history, "{next_move}").unwrap();
         game.play(next_move);
@@ -195,4 +197,68 @@ impl TwoPlayerGame for ConnectFour {
             Player::Two
         }
     }
+}
+
+/// Uses a random playout to generate a bias. However the random players will take a winning move if
+/// any is possible. A player will also prefer move wich prevent his opponent from winning
+/// immediately on his/her next move, if possible.
+struct ConnectFourBias;
+
+impl Bias<ConnectFour> for ConnectFourBias {
+    fn bias(
+        &self,
+        mut game: ConnectFour,
+        move_buf: &mut Vec<Column>,
+        rng: &mut impl Rng,
+    ) -> Evaluation {
+        // Check for terminal position. Actually this should never be used, as bias should only be
+        // invoked on non-terminal positions.
+        debug_assert!(!game.0.is_victory());
+        // If the current player can win in the next move, we can deterministically say that this
+        // board evaluates to a win for this player.
+        if game.0.can_win_in_next_move() {
+            return Evaluation::Win(game.current_player());
+        }
+        loop {
+            match game.state(move_buf) {
+                GameState::Moves(moves) => {
+                    let next_move = *moves.choose(rng).unwrap();
+                    game.play(&next_move);
+                }
+                GameState::WinPlayerOne => {
+                    return Evaluation::Undecided(Count {
+                        wins_player_one: 1,
+                        ..Count::default()
+                    })
+                }
+                GameState::WinPlayerTwo => {
+                    return Evaluation::Undecided(Count {
+                        wins_player_two: 1,
+                        ..Count::default()
+                    })
+                }
+                GameState::Draw => {
+                    return Evaluation::Undecided(Count {
+                        draws: 1,
+                        ..Count::default()
+                    })
+                }
+            }
+        }
+    }
+}
+
+fn use_tree_to_generate_move<B>(
+    game: connect_four_solver::ConnectFour,
+    num_playouts: u32,
+    bias: B,
+    rng: &mut impl Rng,
+) -> Column
+where
+    B: Bias<ConnectFour>,
+{
+    let tree = Tree::with_playouts(ConnectFour(game), bias, num_playouts, rng);
+    eprintln!("nodes: {} links: {}", tree.num_nodes(), tree.num_links());
+    print_move_statistics(&tree);
+    tree.best_move().unwrap()
 }
