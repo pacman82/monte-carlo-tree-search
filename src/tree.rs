@@ -2,7 +2,7 @@ use std::cmp::Ordering;
 
 use rand::{seq::SliceRandom as _, Rng};
 
-use crate::{evaluation::Evaluation, simulation, Player, TwoPlayerGame};
+use crate::{evaluation::Evaluation, simulation, Count, Player, TwoPlayerGame};
 
 pub struct Tree<G: TwoPlayerGame> {
     /// Game state of the root node.
@@ -254,13 +254,19 @@ where
     fn backpropagation(&mut self, node_index: usize, mut player: Player) {
         let mut delta = self.nodes[node_index].evaluation;
         let mut current = self.nodes[node_index].parent_index();
+        // Total of child node before propagation. The original node index is the newly added leaf
+        // so we can assume it to be 1. We keep track of this value going upwards, in case an
+        // a solved node flips to an undecided node, to count all previous visits to the solved 
+        // child node as one the analogos of the solved state.
+        let mut child_count = delta.into_count();
         while let Some(current_node_index) = current {
             player.flip();
 
             let (updated_evaluation, new_delta) =
-                self.updated_evaluation(current_node_index, delta, player);
+                self.updated_evaluation(current_node_index, delta, player, child_count);
             delta = new_delta;
             let node = &mut self.nodes[current_node_index];
+            child_count = node.evaluation.into_count();
             node.evaluation = updated_evaluation;
             current = node.parent_index();
         }
@@ -277,6 +283,7 @@ where
         node_index: usize,
         propagated_evaluation: Evaluation,
         choosing_player: Player,
+        previous_child_count: Count,
     ) -> (Evaluation, Evaluation) {
         let old_evaluation = self.nodes[node_index].evaluation;
         if propagated_evaluation == Evaluation::Win(choosing_player) {
@@ -308,7 +315,33 @@ where
             }
         }
         // No deterministic outcome, let's propagete the counts
-        let propageted_count = propagated_evaluation.into_count();
+        let propageted_count = match propagated_evaluation {
+            Evaluation::Win(Player::One) => {
+                let mut count = Count {
+                    wins_player_one: previous_child_count.total() + propagated_evaluation.total(),
+                    ..Default::default()
+                };
+                count -= previous_child_count;
+                count
+            }
+            Evaluation::Win(Player::Two) => {
+                let mut count = Count {
+                    wins_player_two: previous_child_count.total() + propagated_evaluation.total(),
+                    ..Default::default()
+                };
+                count -= previous_child_count;
+                count
+            }
+            Evaluation::Draw => {
+                let mut count = Count {
+                    draws: previous_child_count.total() + propagated_evaluation.total(),
+                    ..Default::default()
+                };
+                count -= previous_child_count;
+                count
+            },
+            Evaluation::Undecided(count) => count,
+        };
 
         match old_evaluation {
             Evaluation::Undecided(mut count) => {

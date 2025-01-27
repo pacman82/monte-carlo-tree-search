@@ -1,4 +1,4 @@
-use std::{cmp::Ordering, ops::AddAssign};
+use std::{cmp::Ordering, ops::{AddAssign, SubAssign}};
 
 use crate::Player;
 
@@ -70,7 +70,7 @@ impl Evaluation {
     }
 
     /// Count of total playouts
-    pub(crate) fn total(&self) -> u32 {
+    pub(crate) fn total(&self) -> i32 {
         match self {
             Evaluation::Undecided(count) => count.total(),
             Evaluation::Win(_) | Evaluation::Draw => 1,
@@ -110,9 +110,9 @@ impl Default for Evaluation {
 /// Counts accumulated wins, losses and draws for this part of the tree
 #[derive(Default, Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Count {
-    pub wins_player_one: u32,
-    pub wins_player_two: u32,
-    pub draws: u32,
+    pub wins_player_one: i32,
+    pub wins_player_two: i32,
+    pub draws: i32,
 }
 
 impl Count {
@@ -141,7 +141,7 @@ impl Count {
     }
 
     /// Count of total playouts
-    pub fn total(&self) -> u32 {
+    pub fn total(&self) -> i32 {
         self.wins_player_one + self.wins_player_two + self.draws
     }
 
@@ -159,6 +159,14 @@ impl AddAssign for Count {
         self.wins_player_one += other.wins_player_one;
         self.wins_player_two += other.wins_player_two;
         self.draws += other.draws;
+    }
+}
+
+impl SubAssign for Count {
+    fn sub_assign(&mut self, other: Self) {
+        self.wins_player_one -= other.wins_player_one;
+        self.wins_player_two -= other.wins_player_two;
+        self.draws -= other.draws;
     }
 }
 
