@@ -5,7 +5,7 @@ mod simulation;
 mod tree;
 mod two_player_game;
 
-use self::simulation::simulation;
+use self::simulation::random_play;
 
 pub use self::{
     bias::{Bias, RandomPlayoutBias},

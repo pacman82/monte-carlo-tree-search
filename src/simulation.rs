@@ -3,7 +3,7 @@ use rand::{seq::IndexedRandom as _, Rng};
 
 /// Play random moves, until the game is over and report the score from the perspective of the
 /// player whose turn it is.
-pub fn simulation<G>(mut game: G, moves_buf: &mut Vec<G::Move>, rng: &mut impl Rng) -> Count
+pub fn random_play<G>(mut game: G, moves_buf: &mut Vec<G::Move>, rng: &mut impl Rng) -> Count
 where
     G: TwoPlayerGame,
 {
