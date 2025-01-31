@@ -7,25 +7,15 @@ use crate::Player;
 
 /// Controls what information is stored for each board remembered in the nodes of the tree, how
 /// to change it during backpropagation and what criteria to use to select the next node to expand.
-pub trait Evaluation{}
+pub trait Evaluation{
+    /// Define an ordering between two evaluations, so that the greates value is the most favorable
+    /// move for the given player. This method is currently used by [`crate::Tree`] in order to
+    /// update the best move found so far after each playout.
+    fn cmp_for(&self, other: &Self, player: Player) -> Ordering;
+}
 
 impl Evaluation for Ucb{
-    
-}
-
-/// Use an Upper Confidence Bound to select the next node to expand.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Ucb {
-    Win(Player),
-    Draw,
-    /// The outcome could not yet be proven to be either a win, loss or draw.
-    Undecided(Count),
-}
-
-impl Ucb {
-    /// Compare two evaluations from the perspective of the given player. Ordering is such that the
-    /// greater argument is more favorable for the player.
-    pub fn cmp_for(&self, other: &Ucb, player: Player) -> Ordering {
+    fn cmp_for(&self, other: &Ucb, player: Player) -> Ordering {
         match (self, other) {
             (Ucb::Win(p1), Ucb::Win(p2)) => {
                 if *p1 == *p2 {
@@ -60,7 +50,18 @@ impl Ucb {
             (a, b) => b.cmp_for(a, player).reverse(),
         }
     }
+}
 
+/// Use an Upper Confidence Bound to select the next node to expand.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Ucb {
+    Win(Player),
+    Draw,
+    /// The outcome could not yet be proven to be either a win, loss or draw.
+    Undecided(Count),
+}
+
+impl Ucb {
     /// A weight used to decide how much we want to explore this node.
     pub(crate) fn selection_weight(
         &self,
@@ -185,7 +186,7 @@ impl SubAssign for Count {
 mod test {
     use std::cmp::Ordering;
 
-    use crate::{Count, Ucb, Player};
+    use crate::{Count, Evaluation as _, Player, Ucb};
 
     #[test]
     fn compare_evaluations() {
