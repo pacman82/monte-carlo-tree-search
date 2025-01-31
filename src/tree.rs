@@ -243,7 +243,7 @@ where
     /// # Return
     ///
     /// First element is the evaluation of the node specified in node_index. The second element is
-    /// the delta which should be propagated to its parrent node
+    /// the delta which should be propagated to its parent node
     fn updated_evaluation(
         &self,
         node_index: usize,
