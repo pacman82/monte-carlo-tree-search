@@ -4,6 +4,9 @@ use rand::{seq::IndexedRandom as _, Rng};
 
 use crate::{evaluation::Evaluation, Bias, Count, Player, TwoPlayerGame};
 
+/// A tree there the nodes represent game states and the links represent moves. The tree does only
+/// store the root game state and reconstruct the nodes based on the moves. It does store an
+/// evaluation for each node though. The evaluation is updated during each playout.
 pub struct Tree<G: TwoPlayerGame, B> {
     /// Game state of the root node.
     game: G,

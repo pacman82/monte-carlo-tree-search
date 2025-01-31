@@ -1,7 +1,8 @@
 use crate::{Count, Evaluation, Player};
 
-/// Two Player games are games there two players alternate taking turns, until the game ends in
-/// either victory for one player (and defeat for the other) or a draw.
+/// A game there players take alternating turns until it ends either a win for one of the players or
+/// a draw. Implement this trait for your game in order to use monte carlo tree search to find a
+/// strong move.
 pub trait TwoPlayerGame: Clone {
     /// A possible action to take in the game.
     type Move: Copy + Eq;

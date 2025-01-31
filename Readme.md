@@ -1,6 +1,6 @@
 # Monte Carlo Tree Search
 
-A Rust crate to perfom monte carlo tree searches.
+A Rust crate to perfom monte carlo tree searches on two player board games.
 
 ## Motivation
 
