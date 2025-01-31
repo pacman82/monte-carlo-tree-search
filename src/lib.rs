@@ -6,7 +6,7 @@ mod two_player_game;
 
 pub use self::{
     bias::{random_play, Bias, RandomPlayoutBias},
-    evaluation::{Count, Evaluation},
+    evaluation::{Count, Ucb, Evaluation},
     player::Player,
     tree::Tree,
     two_player_game::{GameState, TwoPlayerGame},

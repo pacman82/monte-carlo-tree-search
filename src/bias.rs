@@ -1,10 +1,13 @@
 use rand::{seq::IndexedRandom as _, Rng};
 
-use crate::{Count, Evaluation, GameState, TwoPlayerGame};
+use crate::{Count, Evaluation, GameState, TwoPlayerGame, Ucb};
 
 /// Used to obtain an ininitial bias for the outcome of a game starting from a given board.
 pub trait Bias<G: TwoPlayerGame> {
-    fn bias(&self, game: G, move_buf: &mut Vec<G::Move>, rng: &mut impl Rng) -> Evaluation;
+    /// The type of evaluation returned by the bias.
+    type Evaluation: Evaluation;
+
+    fn bias(&self, game: G, move_buf: &mut Vec<G::Move>, rng: &mut impl Rng) -> Ucb;
 }
 
 /// Obtain an initial bias by playing random moves and reporting the outcome.
@@ -14,8 +17,10 @@ impl<G> Bias<G> for RandomPlayoutBias
 where
     G: TwoPlayerGame,
 {
-    fn bias(&self, game: G, move_buf: &mut Vec<G::Move>, rng: &mut impl Rng) -> Evaluation {
-        Evaluation::Undecided(random_play(game, move_buf, rng))
+    type Evaluation = Ucb;
+
+    fn bias(&self, game: G, move_buf: &mut Vec<G::Move>, rng: &mut impl Rng) -> Ucb {
+        Ucb::Undecided(random_play(game, move_buf, rng))
     }
 }
 
