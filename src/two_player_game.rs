@@ -1,4 +1,4 @@
-use crate::{Count, Ucb, Player};
+use crate::{Count, CountWithDecided, Player};
 
 /// A game there players take alternating turns until it ends either a win for one of the players or
 /// a draw. Implement this trait for your game in order to use monte carlo tree search to find a
@@ -45,12 +45,12 @@ impl<M> GameState<'_, M> {
         }
     }
 
-    pub(crate) fn map_to_evaluation(&self) -> Ucb {
+    pub(crate) fn map_to_evaluation(&self) -> CountWithDecided {
         match self {
-            GameState::Moves(_) => Ucb::Undecided(Count::default()),
-            GameState::Draw => Ucb::Draw,
-            GameState::WinPlayerOne => Ucb::Win(Player::One),
-            GameState::WinPlayerTwo => Ucb::Win(Player::Two),
+            GameState::Moves(_) => CountWithDecided::Undecided(Count::default()),
+            GameState::Draw => CountWithDecided::Draw,
+            GameState::WinPlayerOne => CountWithDecided::Win(Player::One),
+            GameState::WinPlayerTwo => CountWithDecided::Win(Player::Two),
         }
     }
 }

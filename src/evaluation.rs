@@ -12,12 +12,19 @@ pub trait Evaluation{
     /// move for the given player. This method is currently used by [`crate::Tree`] in order to
     /// update the best move found so far after each playout.
     fn cmp_for(&self, other: &Self, player: Player) -> Ordering;
+
+    /// A weight used to decide how much we want to explore this node, compared to its siblings.
+    fn selection_weight(
+        &self,
+        parent_eval: &Self,
+        selecting_player: Player,
+    ) -> f32;
 }
 
-impl Evaluation for Ucb{
-    fn cmp_for(&self, other: &Ucb, player: Player) -> Ordering {
+impl Evaluation for CountWithDecided{
+    fn cmp_for(&self, other: &CountWithDecided, player: Player) -> Ordering {
         match (self, other) {
-            (Ucb::Win(p1), Ucb::Win(p2)) => {
+            (CountWithDecided::Win(p1), CountWithDecided::Win(p2)) => {
                 if *p1 == *p2 {
                     Ordering::Equal
                 } else if *p1 == player {
@@ -26,52 +33,41 @@ impl Evaluation for Ucb{
                     Ordering::Less
                 }
             }
-            (Ucb::Win(p1), _) => {
+            (CountWithDecided::Win(p1), _) => {
                 if *p1 == player {
                     Ordering::Greater
                 } else {
                     Ordering::Less
                 }
             }
-            (Ucb::Draw, Ucb::Win(p2)) => {
+            (CountWithDecided::Draw, CountWithDecided::Win(p2)) => {
                 if *p2 == player {
                     Ordering::Less
                 } else {
                     Ordering::Greater
                 }
             }
-            (Ucb::Draw, Ucb::Draw) => Ordering::Equal,
-            (Ucb::Draw, Ucb::Undecided(count)) => {
+            (CountWithDecided::Draw, CountWithDecided::Draw) => Ordering::Equal,
+            (CountWithDecided::Draw, CountWithDecided::Undecided(count)) => {
                 0.5.partial_cmp(&count.reward(player)).unwrap()
             }
-            (Ucb::Undecided(c1), Ucb::Undecided(c2)) => {
+            (CountWithDecided::Undecided(c1), CountWithDecided::Undecided(c2)) => {
                 c1.reward(player).partial_cmp(&c2.reward(player)).unwrap()
             }
             (a, b) => b.cmp_for(a, player).reverse(),
         }
     }
-}
 
-/// Use an Upper Confidence Bound to select the next node to expand.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Ucb {
-    Win(Player),
-    Draw,
-    /// The outcome could not yet be proven to be either a win, loss or draw.
-    Undecided(Count),
-}
-
-impl Ucb {
-    /// A weight used to decide how much we want to explore this node.
-    pub(crate) fn selection_weight(
+    fn selection_weight(
         &self,
-        total_visits_parent: f32,
+        parent_eval: &CountWithDecided,
         selecting_player: Player,
     ) -> f32 {
+        let total_visits_parent = parent_eval.total() as f32;
         match self {
-            Ucb::Undecided(count) => count.ucb(total_visits_parent, selecting_player),
-            Ucb::Draw => 0.5,
-            Ucb::Win(winning_player) => {
+            CountWithDecided::Undecided(count) => count.ucb(total_visits_parent, selecting_player),
+            CountWithDecided::Draw => 0.5,
+            CountWithDecided::Win(winning_player) => {
                 if selecting_player == *winning_player {
                     f32::MAX
                 } else {
@@ -80,24 +76,46 @@ impl Ucb {
             }
         }
     }
+}
 
+/// Use an Upper Confidence Bound to select the next node to expand. In addition to the use of the
+/// "classic" upper confidence bound, this evaluation also features variants for states such as
+/// `Draw` and `Win`. This allows the tree search to proof the outcome of a game and turn into a
+/// weak solver. "Weak" in this context means that the solver would know if a move is a win, loss or
+/// draw, but not how many moves it takes to reach that outcome.
+/// 
+/// It can take a lot of memory and compute to proof the outcome of a game, so luckily you still get
+/// the counts from undecided if you decide to stop the monte carlo search before a proof is
+/// reached.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CountWithDecided {
+    /// The board has been proven to be a win for the given player, given perfect play of both
+    /// players.
+    Win(Player),
+    /// The board has been proven to be a draw, given perfect play of both players.
+    Draw,
+    /// The outcome could not yet be proven to be either a win, loss or draw.
+    Undecided(Count),
+}
+
+impl CountWithDecided {
     /// Count of total playouts
     pub(crate) fn total(&self) -> i32 {
         match self {
-            Ucb::Undecided(count) => count.total(),
-            Ucb::Win(_) | Ucb::Draw => 1,
+            CountWithDecided::Undecided(count) => count.total(),
+            CountWithDecided::Win(_) | CountWithDecided::Draw => 1,
         }
     }
 
     /// Convert solved solutions to their underterministic counter part
     pub(crate) fn into_count(self) -> Count {
         match self {
-            Ucb::Undecided(count) => count,
-            Ucb::Draw => Count {
+            CountWithDecided::Undecided(count) => count,
+            CountWithDecided::Draw => Count {
                 draws: 1,
                 ..Count::default()
             },
-            Ucb::Win(player) => {
+            CountWithDecided::Win(player) => {
                 let mut count = Count::default();
                 count.report_win_for(player);
                 count
@@ -107,13 +125,13 @@ impl Ucb {
 
     pub fn is_solved(&self) -> bool {
         match self {
-            Ucb::Win(_) | Ucb::Draw => true,
-            Ucb::Undecided(_) => false,
+            CountWithDecided::Win(_) | CountWithDecided::Draw => true,
+            CountWithDecided::Undecided(_) => false,
         }
     }
 }
 
-impl Default for Ucb {
+impl Default for CountWithDecided {
     fn default() -> Self {
         Self::Undecided(Count::default())
     }
@@ -186,13 +204,13 @@ impl SubAssign for Count {
 mod test {
     use std::cmp::Ordering;
 
-    use crate::{Count, Evaluation as _, Player, Ucb};
+    use crate::{Count, Evaluation as _, Player, CountWithDecided};
 
     #[test]
     fn compare_evaluations() {
-        let win_player_one = Ucb::Win(Player::One);
-        let win_player_two = Ucb::Win(Player::Two);
-        let draw = Ucb::Draw;
+        let win_player_one = CountWithDecided::Win(Player::One);
+        let win_player_two = CountWithDecided::Win(Player::Two);
+        let draw = CountWithDecided::Draw;
         let one = Player::One;
         let two = Player::Two;
 
@@ -212,7 +230,7 @@ mod test {
         assert_eq!(draw.cmp_for(&draw, one), Ordering::Equal);
         assert_eq!(
             draw.cmp_for(
-                &Ucb::Undecided(Count {
+                &CountWithDecided::Undecided(Count {
                     draws: 1,
                     ..Count::default()
                 }),
@@ -222,7 +240,7 @@ mod test {
         );
         assert_eq!(
             draw.cmp_for(
-                &Ucb::Undecided(Count {
+                &CountWithDecided::Undecided(Count {
                     wins_player_one: 1,
                     ..Count::default()
                 }),
@@ -231,7 +249,7 @@ mod test {
             Ordering::Less
         );
         assert_eq!(
-            Ucb::Undecided(Count {
+            CountWithDecided::Undecided(Count {
                 wins_player_one: 1,
                 ..Count::default()
             })
@@ -239,7 +257,7 @@ mod test {
             Ordering::Less
         );
         assert_eq!(
-            Ucb::Undecided(Count {
+            CountWithDecided::Undecided(Count {
                 wins_player_two: 1,
                 ..Count::default()
             })
@@ -247,12 +265,12 @@ mod test {
             Ordering::Greater
         );
         assert_eq!(
-            Ucb::Undecided(Count {
+            CountWithDecided::Undecided(Count {
                 wins_player_one: 1,
                 ..Count::default()
             })
             .cmp_for(
-                &Ucb::Undecided(Count {
+                &CountWithDecided::Undecided(Count {
                     wins_player_two: 1,
                     ..Count::default()
                 }),
