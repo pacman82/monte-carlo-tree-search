@@ -2,7 +2,7 @@ use std::cmp::Ordering;
 
 use rand::{seq::IndexedRandom as _, Rng};
 
-use crate::{evaluation::Evaluation, Bias, Count, Player, TwoPlayerGame};
+use crate::{evaluation::Ucb, Bias, Count, Evaluation, Player, TwoPlayerGame};
 
 /// A tree there the nodes represent game states and the links represent moves. The tree does only
 /// store the root game state and reconstruct the nodes based on the moves. It does store an
@@ -119,12 +119,12 @@ where
     }
 
     /// Evaluation of a node the link directs to. Handles unexplored nodes.
-    fn evaluation_by_link_index(&self, link_index: usize) -> Evaluation {
+    fn evaluation_by_link_index(&self, link_index: usize) -> Ucb {
         let link = self.links[link_index];
         if link.is_explored() {
             self.nodes[link.child].evaluation
         } else {
-            Evaluation::default()
+            Ucb::default()
         }
     }
 
@@ -246,17 +246,17 @@ where
     fn updated_evaluation(
         &self,
         node_index: usize,
-        propagated_evaluation: Evaluation,
+        propagated_evaluation: Ucb,
         choosing_player: Player,
         previous_child_count: Count,
-    ) -> (Evaluation, Evaluation) {
+    ) -> (Ucb, Ucb) {
         let old_evaluation = self.nodes[node_index].evaluation;
-        if propagated_evaluation == Evaluation::Win(choosing_player) {
+        if propagated_evaluation == Ucb::Win(choosing_player) {
             // If it is the choosing players turn, she will choose a win
             return (propagated_evaluation, propagated_evaluation);
         }
         // If the choosing player is not guaranteed to win let's check if there is a draw or a loss
-        let loss = Evaluation::Win(choosing_player.opponent());
+        let loss = Ucb::Win(choosing_player.opponent());
         if propagated_evaluation.is_solved() {
             let mut acc = Some(loss);
             for link in self.child_links(node_index) {
@@ -266,9 +266,9 @@ where
                     break;
                 }
                 let child_eval = self.nodes[link.child].evaluation;
-                if child_eval == Evaluation::Draw {
+                if child_eval == Ucb::Draw {
                     // Found a draw, so we can be sure its not a loss
-                    acc = Some(Evaluation::Draw);
+                    acc = Some(Ucb::Draw);
                 } else if child_eval != loss {
                     // Found a child neither draw or loss, so we can not rule out a victory yet
                     acc = None;
@@ -281,7 +281,7 @@ where
         }
         // No deterministic outcome, let's propagete the counts
         let propageted_count = match propagated_evaluation {
-            Evaluation::Win(Player::One) => {
+            Ucb::Win(Player::One) => {
                 let mut count = Count {
                     wins_player_one: previous_child_count.total() + propagated_evaluation.total(),
                     ..Default::default()
@@ -289,7 +289,7 @@ where
                 count -= previous_child_count;
                 count
             }
-            Evaluation::Win(Player::Two) => {
+            Ucb::Win(Player::Two) => {
                 let mut count = Count {
                     wins_player_two: previous_child_count.total() + propagated_evaluation.total(),
                     ..Default::default()
@@ -297,7 +297,7 @@ where
                 count -= previous_child_count;
                 count
             }
-            Evaluation::Draw => {
+            Ucb::Draw => {
                 let mut count = Count {
                     draws: previous_child_count.total() + propagated_evaluation.total(),
                     ..Default::default()
@@ -305,18 +305,18 @@ where
                 count -= previous_child_count;
                 count
             }
-            Evaluation::Undecided(count) => count,
+            Ucb::Undecided(count) => count,
         };
 
         match old_evaluation {
-            Evaluation::Undecided(mut count) => {
+            Ucb::Undecided(mut count) => {
                 count += propageted_count;
                 (
-                    Evaluation::Undecided(count),
-                    Evaluation::Undecided(propageted_count),
+                    Ucb::Undecided(count),
+                    Ucb::Undecided(propageted_count),
                 )
             }
-            _ => (old_evaluation, Evaluation::Undecided(propageted_count)),
+            _ => (old_evaluation, Ucb::Undecided(propageted_count)),
         }
     }
 
@@ -339,11 +339,11 @@ where
     G: TwoPlayerGame,
 {
     /// Count of playouts of the root node.
-    pub fn evaluation(&self) -> Evaluation {
+    pub fn evaluation(&self) -> Ucb {
         self.nodes[0].evaluation
     }
 
-    pub fn eval_by_move(&self) -> impl Iterator<Item = (G::Move, Evaluation)> + '_ {
+    pub fn eval_by_move(&self) -> impl Iterator<Item = (G::Move, Ucb)> + '_ {
         let root = &self.nodes[0];
         self.links[root.children_begin..root.children_end]
             .iter()
@@ -352,7 +352,7 @@ where
                     let child = &self.nodes[link.child];
                     (link.move_, child.evaluation)
                 } else {
-                    (link.move_, Evaluation::default())
+                    (link.move_, Ucb::default())
                 }
             })
     }
@@ -387,7 +387,7 @@ struct Node {
     /// of the next node would start, i.e. `children_begin + num_children`. `0` if the node does not
     /// have children.
     children_end: usize,
-    evaluation: Evaluation,
+    evaluation: Ucb,
 }
 
 impl Node {
@@ -395,7 +395,7 @@ impl Node {
         parent: usize,
         children_begin: usize,
         children_end: usize,
-        estimated_outcome: Evaluation,
+        estimated_outcome: Ucb,
     ) -> Self {
         Self {
             parent,

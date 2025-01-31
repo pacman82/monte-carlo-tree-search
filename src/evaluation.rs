@@ -5,20 +5,29 @@ use std::{
 
 use crate::Player;
 
+/// Controls what information is stored for each board remembered in the nodes of the tree, how
+/// to change it during backpropagation and what criteria to use to select the next node to expand.
+pub trait Evaluation{}
+
+impl Evaluation for Ucb{
+    
+}
+
+/// Use an Upper Confidence Bound to select the next node to expand.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Evaluation {
+pub enum Ucb {
     Win(Player),
     Draw,
     /// The outcome could not yet be proven to be either a win, loss or draw.
     Undecided(Count),
 }
 
-impl Evaluation {
+impl Ucb {
     /// Compare two evaluations from the perspective of the given player. Ordering is such that the
     /// greater argument is more favorable for the player.
-    pub fn cmp_for(&self, other: &Evaluation, player: Player) -> Ordering {
+    pub fn cmp_for(&self, other: &Ucb, player: Player) -> Ordering {
         match (self, other) {
-            (Evaluation::Win(p1), Evaluation::Win(p2)) => {
+            (Ucb::Win(p1), Ucb::Win(p2)) => {
                 if *p1 == *p2 {
                     Ordering::Equal
                 } else if *p1 == player {
@@ -27,25 +36,25 @@ impl Evaluation {
                     Ordering::Less
                 }
             }
-            (Evaluation::Win(p1), _) => {
+            (Ucb::Win(p1), _) => {
                 if *p1 == player {
                     Ordering::Greater
                 } else {
                     Ordering::Less
                 }
             }
-            (Evaluation::Draw, Evaluation::Win(p2)) => {
+            (Ucb::Draw, Ucb::Win(p2)) => {
                 if *p2 == player {
                     Ordering::Less
                 } else {
                     Ordering::Greater
                 }
             }
-            (Evaluation::Draw, Evaluation::Draw) => Ordering::Equal,
-            (Evaluation::Draw, Evaluation::Undecided(count)) => {
+            (Ucb::Draw, Ucb::Draw) => Ordering::Equal,
+            (Ucb::Draw, Ucb::Undecided(count)) => {
                 0.5.partial_cmp(&count.reward(player)).unwrap()
             }
-            (Evaluation::Undecided(c1), Evaluation::Undecided(c2)) => {
+            (Ucb::Undecided(c1), Ucb::Undecided(c2)) => {
                 c1.reward(player).partial_cmp(&c2.reward(player)).unwrap()
             }
             (a, b) => b.cmp_for(a, player).reverse(),
@@ -59,9 +68,9 @@ impl Evaluation {
         selecting_player: Player,
     ) -> f32 {
         match self {
-            Evaluation::Undecided(count) => count.ucb(total_visits_parent, selecting_player),
-            Evaluation::Draw => 0.5,
-            Evaluation::Win(winning_player) => {
+            Ucb::Undecided(count) => count.ucb(total_visits_parent, selecting_player),
+            Ucb::Draw => 0.5,
+            Ucb::Win(winning_player) => {
                 if selecting_player == *winning_player {
                     f32::MAX
                 } else {
@@ -74,20 +83,20 @@ impl Evaluation {
     /// Count of total playouts
     pub(crate) fn total(&self) -> i32 {
         match self {
-            Evaluation::Undecided(count) => count.total(),
-            Evaluation::Win(_) | Evaluation::Draw => 1,
+            Ucb::Undecided(count) => count.total(),
+            Ucb::Win(_) | Ucb::Draw => 1,
         }
     }
 
     /// Convert solved solutions to their underterministic counter part
     pub(crate) fn into_count(self) -> Count {
         match self {
-            Evaluation::Undecided(count) => count,
-            Evaluation::Draw => Count {
+            Ucb::Undecided(count) => count,
+            Ucb::Draw => Count {
                 draws: 1,
                 ..Count::default()
             },
-            Evaluation::Win(player) => {
+            Ucb::Win(player) => {
                 let mut count = Count::default();
                 count.report_win_for(player);
                 count
@@ -97,13 +106,13 @@ impl Evaluation {
 
     pub fn is_solved(&self) -> bool {
         match self {
-            Evaluation::Win(_) | Evaluation::Draw => true,
-            Evaluation::Undecided(_) => false,
+            Ucb::Win(_) | Ucb::Draw => true,
+            Ucb::Undecided(_) => false,
         }
     }
 }
 
-impl Default for Evaluation {
+impl Default for Ucb {
     fn default() -> Self {
         Self::Undecided(Count::default())
     }
@@ -176,13 +185,13 @@ impl SubAssign for Count {
 mod test {
     use std::cmp::Ordering;
 
-    use crate::{Count, Evaluation, Player};
+    use crate::{Count, Ucb, Player};
 
     #[test]
     fn compare_evaluations() {
-        let win_player_one = Evaluation::Win(Player::One);
-        let win_player_two = Evaluation::Win(Player::Two);
-        let draw = Evaluation::Draw;
+        let win_player_one = Ucb::Win(Player::One);
+        let win_player_two = Ucb::Win(Player::Two);
+        let draw = Ucb::Draw;
         let one = Player::One;
         let two = Player::Two;
 
@@ -202,7 +211,7 @@ mod test {
         assert_eq!(draw.cmp_for(&draw, one), Ordering::Equal);
         assert_eq!(
             draw.cmp_for(
-                &Evaluation::Undecided(Count {
+                &Ucb::Undecided(Count {
                     draws: 1,
                     ..Count::default()
                 }),
@@ -212,7 +221,7 @@ mod test {
         );
         assert_eq!(
             draw.cmp_for(
-                &Evaluation::Undecided(Count {
+                &Ucb::Undecided(Count {
                     wins_player_one: 1,
                     ..Count::default()
                 }),
@@ -221,7 +230,7 @@ mod test {
             Ordering::Less
         );
         assert_eq!(
-            Evaluation::Undecided(Count {
+            Ucb::Undecided(Count {
                 wins_player_one: 1,
                 ..Count::default()
             })
@@ -229,7 +238,7 @@ mod test {
             Ordering::Less
         );
         assert_eq!(
-            Evaluation::Undecided(Count {
+            Ucb::Undecided(Count {
                 wins_player_two: 1,
                 ..Count::default()
             })
@@ -237,12 +246,12 @@ mod test {
             Ordering::Greater
         );
         assert_eq!(
-            Evaluation::Undecided(Count {
+            Ucb::Undecided(Count {
                 wins_player_one: 1,
                 ..Count::default()
             })
             .cmp_for(
-                &Evaluation::Undecided(Count {
+                &Ucb::Undecided(Count {
                     wins_player_two: 1,
                     ..Count::default()
                 }),
