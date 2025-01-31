@@ -243,7 +243,11 @@ where
     /// # Return
     ///
     /// First element is the evaluation of the node specified in node_index. The second element is
-    /// the delta which should be propagated to its parent node
+    /// the delta which should be propagated to its parent node. How can these differ? Usually the
+    /// two are identical, but consider a situation in which we learn that a node is a proofen loss
+    /// for the choosing player given perfect play of both players. Yet all of its siblings are
+    /// draws. In such a situation we would propagate the draw, but still asign the loss to the 
+    /// loosing node.
     fn updated_evaluation(
         &self,
         node_index: usize,
