@@ -7,7 +7,7 @@ use crate::Player;
 
 /// Controls what information is stored for each board remembered in the nodes of the tree, how
 /// to change it during backpropagation and what criteria to use to select the next node to expand.
-pub trait Evaluation {
+pub trait Evaluation: Copy {
     /// Used during backpropagation to pass information from a child node to its parent.
     type Delta;
 
@@ -27,10 +27,14 @@ pub trait Evaluation {
     /// in turn is passed to the update of its parent node.
     fn update(
         &mut self,
-        sibling_evaluations: impl Iterator<Item = Option<CountOrDecided>>,
+        sibling_evaluations: impl Iterator<Item = Option<Self>>,
         propagated_delta: Self::Delta,
         choosing_player: Player,
     ) -> Self::Delta;
+
+    /// Solved states will be ignored during selection phase. If there are no unsolved nodes left
+    /// in the tree the search will stop.
+    fn is_solved(&self) -> bool;
 }
 
 impl Evaluation for CountOrDecided {
@@ -190,6 +194,13 @@ impl Evaluation for CountOrDecided {
         *self = new_eval;
         delta
     }
+    
+    fn is_solved(&self) -> bool {
+        match self {
+            CountOrDecided::Win(_) | CountOrDecided::Draw => true,
+            CountOrDecided::Undecided(_) => false,
+        }
+    }
 }
 
 /// Use an Upper Confidence Bound to select the next node to expand. In addition to the use of the
@@ -234,13 +245,6 @@ impl CountOrDecided {
                 count.report_win_for(player);
                 count
             }
-        }
-    }
-
-    pub fn is_solved(&self) -> bool {
-        match self {
-            CountOrDecided::Win(_) | CountOrDecided::Draw => true,
-            CountOrDecided::Undecided(_) => false,
         }
     }
 }

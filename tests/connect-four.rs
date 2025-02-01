@@ -282,6 +282,10 @@ impl Bias<ConnectFour> for ConnectFourBias {
             GameState::WinPlayerTwo => CountOrDecided::Win(Player::Two),
         }
     }
+
+    fn unexplored(&self) -> Self::Evaluation {
+        CountOrDecided::Undecided(Count::default())
+    }
 }
 
 fn use_tree_to_generate_move<B>(

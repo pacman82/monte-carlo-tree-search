@@ -41,7 +41,7 @@ pub struct Tree<G: TwoPlayerGame, B: Bias<G>> {
 impl<G, B> Tree<G, B>
 where
     G: TwoPlayerGame,
-    B: Bias<G, Evaluation = CountOrDecided>,
+    B: Bias<G>,
 {
     pub fn new(game: G, bias: B) -> Self {
         let mut move_buf = Vec::new();
@@ -69,65 +69,41 @@ where
         }
     }
 
-    pub fn with_playouts(game: G, bias: B, num_playouts: u32, rng: &mut impl Rng) -> Self {
-        let mut tree = Self::new(game, bias);
-        for _ in 0..num_playouts {
-            if !tree.playout(rng) {
-                break;
-            }
-        }
-        tree
+    /// Picks one of the best moves for the current player. `None` if the root node has no children.
+    pub fn best_move(&self) -> Option<G::Move> {
+        self.best_link
+            .map(|link_index| self.links[link_index].move_)
     }
 
-    /// Playout one cycle of selection, expansion, simulation and backpropagation. `true` if the
-    /// playout may have changed the evaluation of the root, `false` if the game is already solved.
-    pub fn playout(&mut self, rng: &mut impl Rng) -> bool {
-        let Some((to_be_expanded_index, mut game)) = self.select_unexplored_node() else {
-            return false;
-        };
-        // Create a new child node for the selected node and let `game` represent its state
-        let new_node_index = self.expand(to_be_expanded_index, &mut game, rng);
-
-        // Player whom gets to choose the next turn in the board the (new) leaf node represents.
-        let player = game.current_player();
-
-        // If the game is not in a terminal state, start a simulation to gain an initial estimate
-        if !self.nodes[new_node_index].evaluation.is_solved() {
-            let bias = self.bias.bias(game, &mut self.move_buf, rng);
-            self.nodes[new_node_index].evaluation = bias;
-        }
-
-        self.backpropagation(new_node_index, player);
-        self.update_best_link();
-        true
+    pub fn num_nodes(&self) -> usize {
+        self.nodes.len()
     }
 
-    fn update_best_link(&mut self) {
-        let current_player = self.game.current_player();
+    pub fn num_links(&self) -> usize {
+        self.links.len()
+    }
+
+    pub fn game(&self) -> &G {
+        &self.game
+    }
+
+    /// Count of playouts of the root node.
+    pub fn evaluation(&self) -> B::Evaluation {
+        self.nodes[0].evaluation
+    }
+
+    pub fn eval_by_move(&self) -> impl Iterator<Item = (G::Move, B::Evaluation)> + '_ {
         let root = &self.nodes[0];
-        for link_index in root.children_begin..root.children_end {
-            if self.best_link.is_none() {
-                self.best_link = Some(link_index);
-                continue;
-            }
-            let candidate_evaluation = self.evaluation_by_link_index(link_index);
-            let best_so_far_evaluation = self.evaluation_by_link_index(self.best_link.unwrap());
-            if candidate_evaluation.cmp_for(&best_so_far_evaluation, current_player)
-                == Ordering::Greater
-            {
-                self.best_link = Some(link_index);
-            }
-        }
-    }
-
-    /// Evaluation of a node the link directs to. Handles unexplored nodes.
-    fn evaluation_by_link_index(&self, link_index: usize) -> CountOrDecided {
-        let link = self.links[link_index];
-        if link.is_explored() {
-            self.nodes[link.child].evaluation
-        } else {
-            CountOrDecided::default()
-        }
+        self.links[root.children_begin..root.children_end]
+            .iter()
+            .map(move |link| {
+                if link.is_explored() {
+                    let child = &self.nodes[link.child];
+                    (link.move_, child.evaluation)
+                } else {
+                    (link.move_, self.bias.unexplored())
+                }
+            })
     }
 
     /// Selects a node of the tree of which is not solved (yet?). This means we do not know given
@@ -173,20 +149,6 @@ where
         Some((current_node_index, game))
     }
 
-    /// Link index of a random unexplored child of the selected node.
-    fn pick_unexplored_child_of(&mut self, node_index: usize, rng: &mut impl Rng) -> usize {
-        let node = &self.nodes[node_index];
-        let child_links_indices = node.children_begin..node.children_end;
-        self.candidate_link_index_buf.clear();
-        self.candidate_link_index_buf.extend(
-            child_links_indices.filter(|&link_index| !self.links[link_index].is_explored()),
-        );
-        self.candidate_link_index_buf
-            .choose(rng)
-            .copied()
-            .expect("To be expandend node must have unexplored children")
-    }
-
     /// Expand an unexplored child of the selected node. Mutates `game` to represent state of the
     /// node indicated by the retunned index.
     ///
@@ -219,11 +181,12 @@ where
         new_node_index
     }
 
-    fn backpropagation(&mut self, node_index: usize, mut player: Player) {
-        let mut delta = CountOrDecidedDelta {
-            propagated_evaluation: self.nodes[node_index].evaluation,
-            previous_count: self.nodes[node_index].evaluation.into_count(),
-        };
+    fn backpropagation(
+        &mut self,
+        node_index: usize,
+        mut delta: <B::Evaluation as Evaluation>::Delta,
+        mut player: Player,
+    ) {
         let mut current_child_index = node_index;
         let mut maybe_current_index = self.nodes[node_index].parent_index();
         while let Some(current_node_index) = maybe_current_index {
@@ -254,7 +217,7 @@ where
         &self,
         parent_index: usize,
         child_index: usize,
-    ) -> impl Iterator<Item = Option<CountOrDecided>> + '_ {
+    ) -> impl Iterator<Item = Option<B::Evaluation>> + '_ {
         self.child_links(parent_index).filter_map(move |link| {
             if link.is_explored() {
                 if link.child == child_index {
@@ -266,6 +229,48 @@ where
                 Some(None)
             }
         })
+    }
+
+    fn update_best_link(&mut self) {
+        let current_player = self.game.current_player();
+        let root = &self.nodes[0];
+        for link_index in root.children_begin..root.children_end {
+            if self.best_link.is_none() {
+                self.best_link = Some(link_index);
+                continue;
+            }
+            let candidate_evaluation = self.evaluation_by_link_index(link_index);
+            let best_so_far_evaluation = self.evaluation_by_link_index(self.best_link.unwrap());
+            if candidate_evaluation.cmp_for(&best_so_far_evaluation, current_player)
+                == Ordering::Greater
+            {
+                self.best_link = Some(link_index);
+            }
+        }
+    }
+
+    /// Evaluation of a node the link directs to. Handles unexplored nodes.
+    fn evaluation_by_link_index(&self, link_index: usize) -> B::Evaluation {
+        let link = self.links[link_index];
+        if link.is_explored() {
+            self.nodes[link.child].evaluation
+        } else {
+            self.bias.unexplored()
+        }
+    }
+
+    /// Link index of a random unexplored child of the selected node.
+    fn pick_unexplored_child_of(&mut self, node_index: usize, rng: &mut impl Rng) -> usize {
+        let node = &self.nodes[node_index];
+        let child_links_indices = node.children_begin..node.children_end;
+        self.candidate_link_index_buf.clear();
+        self.candidate_link_index_buf.extend(
+            child_links_indices.filter(|&link_index| !self.links[link_index].is_explored()),
+        );
+        self.candidate_link_index_buf
+            .choose(rng)
+            .copied()
+            .expect("To be expandend node must have unexplored children")
     }
 
     /// `true` if the node has at least one child which is not explored yet.
@@ -280,42 +285,48 @@ where
             .iter()
             .copied()
     }
+}
 
-    /// Count of playouts of the root node.
-    pub fn evaluation(&self) -> CountOrDecided {
-        self.nodes[0].evaluation
+impl<G, B> Tree<G, B>
+where
+    G: TwoPlayerGame,
+    B: Bias<G, Evaluation = CountOrDecided>,
+{
+    pub fn with_playouts(game: G, bias: B, num_playouts: u32, rng: &mut impl Rng) -> Self {
+        let mut tree = Self::new(game, bias);
+        for _ in 0..num_playouts {
+            if !tree.playout(rng) {
+                break;
+            }
+        }
+        tree
     }
 
-    pub fn eval_by_move(&self) -> impl Iterator<Item = (G::Move, CountOrDecided)> + '_ {
-        let root = &self.nodes[0];
-        self.links[root.children_begin..root.children_end]
-            .iter()
-            .map(move |link| {
-                if link.is_explored() {
-                    let child = &self.nodes[link.child];
-                    (link.move_, child.evaluation)
-                } else {
-                    (link.move_, CountOrDecided::default())
-                }
-            })
-    }
+    /// Playout one cycle of selection, expansion, simulation and backpropagation. `true` if the
+    /// playout may have changed the evaluation of the root, `false` if the game is already solved.
+    pub fn playout(&mut self, rng: &mut impl Rng) -> bool {
+        let Some((to_be_expanded_index, mut game)) = self.select_unexplored_node() else {
+            return false;
+        };
+        // Create a new child node for the selected node and let `game` represent its state
+        let new_node_index = self.expand(to_be_expanded_index, &mut game, rng);
 
-    /// Picks one of the best movesfor the current player. `None` if the root node has no children.
-    pub fn best_move(&self) -> Option<G::Move> {
-        self.best_link
-            .map(|link_index| self.links[link_index].move_)
-    }
+        // Player whom gets to choose the next turn in the board the (new) leaf node represents.
+        let player = game.current_player();
 
-    pub fn num_nodes(&self) -> usize {
-        self.nodes.len()
-    }
+        // If the game is not in a terminal state, start a simulation to gain an initial estimate
+        if !self.nodes[new_node_index].evaluation.is_solved() {
+            let bias = self.bias.bias(game, &mut self.move_buf, rng);
+            self.nodes[new_node_index].evaluation = bias;
+        }
 
-    pub fn num_links(&self) -> usize {
-        self.links.len()
-    }
-
-    pub fn game(&self) -> &G {
-        &self.game
+        let delta = CountOrDecidedDelta {
+            propagated_evaluation: self.nodes[new_node_index].evaluation,
+            previous_count: self.nodes[new_node_index].evaluation.into_count(),
+        };
+        self.backpropagation(new_node_index, delta, player);
+        self.update_best_link();
+        true
     }
 }
 
