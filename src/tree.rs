@@ -228,14 +228,34 @@ where
         while let Some(current_node_index) = current {
             player.flip();
 
-            let (updated_evaluation, new_delta) =
-                self.updated_evaluation(current_node_index, delta, player, child_count);
+            let (updated_evaluation, new_delta) = self.updated_evaluation(
+                current_node_index,
+                self.child_evalutations(current_node_index),
+                delta,
+                player,
+                child_count,
+            );
             delta = new_delta;
             let node = &mut self.nodes[current_node_index];
             child_count = node.evaluation.into_count();
             node.evaluation = updated_evaluation;
             current = node.parent_index();
         }
+    }
+
+    /// All evaluations of the children of the given node. If a child is not yet explored, the
+    /// evaluation will be `None`.
+    fn child_evalutations(
+        &self,
+        node_index: usize,
+    ) -> impl Iterator<Item = Option<CountWithDecided>> + '_ {
+        self.child_links(node_index).map(move |link| {
+            if link.is_explored() {
+                Some(self.nodes[link.child].evaluation)
+            } else {
+                None
+            }
+        })
     }
 
     /// Update the evaluation of a node with the propagated evaluation.
@@ -246,11 +266,12 @@ where
     /// the delta which should be propagated to its parent node. How can these differ? Usually the
     /// two are identical, but consider a situation in which we learn that a node is a proofen loss
     /// for the choosing player given perfect play of both players. Yet all of its siblings are
-    /// draws. In such a situation we would propagate the draw, but still asign the loss to the 
+    /// draws. In such a situation we would propagate the draw, but still asign the loss to the
     /// loosing node.
     fn updated_evaluation(
         &self,
         node_index: usize,
+        child_evaluations: impl Iterator<Item = Option<CountWithDecided>>,
         propagated_evaluation: CountWithDecided,
         choosing_player: Player,
         previous_child_count: Count,
@@ -264,13 +285,13 @@ where
         let loss = CountWithDecided::Win(choosing_player.opponent());
         if propagated_evaluation.is_solved() {
             let mut acc = Some(loss);
-            for link in self.child_links(node_index) {
-                if !link.is_explored() {
-                    // Found unexplored node, so we can not be sure its a draw or loss
+            for maybe_eval in child_evaluations {
+                let Some(child_eval) = maybe_eval else {
+                    // Still has unexplored children, so we can not be sure the current node is a
+                    // draw or a loss.
                     acc = None;
                     break;
-                }
-                let child_eval = self.nodes[link.child].evaluation;
+                };
                 if child_eval == CountWithDecided::Draw {
                     // Found a draw, so we can be sure its not a loss
                     acc = Some(CountWithDecided::Draw);
@@ -321,7 +342,10 @@ where
                     CountWithDecided::Undecided(propageted_count),
                 )
             }
-            _ => (old_evaluation, CountWithDecided::Undecided(propageted_count)),
+            _ => (
+                old_evaluation,
+                CountWithDecided::Undecided(propageted_count),
+            ),
         }
     }
 
