@@ -228,7 +228,7 @@ where
         while let Some(current_node_index) = current {
             player.flip();
 
-            let (updated_evaluation, new_delta) = self.updated_evaluation(
+            let (updated_evaluation, new_delta) = Self::updated_evaluation(
                 self.nodes[current_node_index].evaluation,
                 self.child_evalutations(current_node_index),
                 delta,
@@ -269,7 +269,6 @@ where
     /// draws. In such a situation we would propagate the draw, but still asign the loss to the
     /// loosing node.
     fn updated_evaluation(
-        &self,
         previous_evaluation: CountOrDecided,
         child_evaluations: impl Iterator<Item = Option<CountOrDecided>>,
         propagated_evaluation: CountOrDecided,
