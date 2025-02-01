@@ -222,6 +222,7 @@ where
     fn backpropagation(&mut self, node_index: usize, mut player: Player) {
         let mut delta = CountOrDecidedDelta {
             propagated_evaluation: self.nodes[node_index].evaluation,
+            previous_count: self.nodes[node_index].evaluation.into_count(),
         };
         let mut current_child_index = node_index;
         let mut maybe_current_index = self.nodes[node_index].parent_index();
@@ -242,6 +243,7 @@ where
             );
             let node = &mut self.nodes[current_node_index];
             child_count = node.evaluation.into_count();
+            debug_assert_eq!(child_count, delta.previous_count);
             current_child_index = current_node_index;
             node.evaluation = current_evaluation;
             maybe_current_index = node.parent_index();
