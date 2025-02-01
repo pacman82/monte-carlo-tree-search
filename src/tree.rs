@@ -226,11 +226,6 @@ where
         };
         let mut current_child_index = node_index;
         let mut maybe_current_index = self.nodes[node_index].parent_index();
-        // Total of child node before propagation. The original node index is the newly added leaf
-        // so we can assume it to be 1. We keep track of this value going upwards, in case an
-        // a solved node flips to an undecided node, to count all previous visits to the solved
-        // child node as one the analogos of the solved state.
-        let mut child_count = delta.propagated_evaluation.into_count();
         while let Some(current_node_index) = maybe_current_index {
             player.flip();
 
@@ -238,12 +233,9 @@ where
             delta = current_evaluation.update(
                 self.sibling_evalutations(current_node_index, current_child_index),
                 delta,
-                child_count,
                 player,
             );
             let node = &mut self.nodes[current_node_index];
-            child_count = node.evaluation.into_count();
-            debug_assert_eq!(child_count, delta.previous_count);
             current_child_index = current_node_index;
             node.evaluation = current_evaluation;
             maybe_current_index = node.parent_index();
