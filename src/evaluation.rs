@@ -8,6 +8,9 @@ use crate::Player;
 /// Controls what information is stored for each board remembered in the nodes of the tree, how
 /// to change it during backpropagation and what criteria to use to select the next node to expand.
 pub trait Evaluation {
+    /// Used during backpropagation to pass information from a child node to its parent.
+    type Delta;
+
     /// Define an ordering between two evaluations, so that the greates value is the most favorable
     /// move for the given player. This method is currently used by [`crate::Tree`] in order to
     /// update the best move found so far after each playout.
@@ -16,9 +19,23 @@ pub trait Evaluation {
     /// A weight used to decide how much we want to explore this node, compared to its siblings.
     /// Higher weightns make a node more likely to be selected.
     fn selection_weight(&self, parent_eval: &Self, selecting_player: Player) -> f32;
+
+    /// Called during backpropagation. Updates the evaluation of a node based on a propagated delta
+    /// emitted by the update of a child node. In addition to that, we can also take the evaluations
+    /// of the siblings of the changed child into account. The method changes the evaluation of the
+    /// current node during propagation to its new value. In additon to that it emmits a delta which
+    /// in turn is passed to the update of its parent node.
+    fn update(
+        &mut self,
+        sibling_evaluations: impl Iterator<Item = Option<CountOrDecided>>,
+        propagated_delta: Self::Delta,
+        choosing_player: Player,
+    ) -> Self::Delta;
 }
 
 impl Evaluation for CountOrDecided {
+    type Delta = CountOrDecidedDelta;
+
     fn cmp_for(&self, other: &CountOrDecided, player: Player) -> Ordering {
         match (self, other) {
             (CountOrDecided::Win(p1), CountOrDecided::Win(p2)) => {
@@ -69,66 +86,13 @@ impl Evaluation for CountOrDecided {
             }
         }
     }
-}
-
-/// Use an Upper Confidence Bound to select the next node to expand. In addition to the use of the
-/// "classic" upper confidence bound, this evaluation also features variants for states such as
-/// `Draw` and `Win`. This allows the tree search to proof the outcome of a game and turn into a
-/// weak solver. "Weak" in this context means that the solver would know if a move is a win, loss or
-/// draw, but not how many moves it takes to reach that outcome.
-///
-/// It can take a lot of memory and compute to proof the outcome of a game, so luckily you still get
-/// the counts from undecided if you decide to stop the monte carlo search before a proof is
-/// reached.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum CountOrDecided {
-    /// The board has been proven to be a win for the given player, given perfect play of both
-    /// players.
-    Win(Player),
-    /// The board has been proven to be a draw, given perfect play of both players.
-    Draw,
-    /// The outcome could not yet be proven to be either a win, loss or draw.
-    Undecided(Count),
-}
-
-impl CountOrDecided {
-    /// Count of total playouts
-    pub(crate) fn total(&self) -> i32 {
-        match self {
-            CountOrDecided::Undecided(count) => count.total(),
-            CountOrDecided::Win(_) | CountOrDecided::Draw => 1,
-        }
-    }
-
-    /// Convert solved solutions to their underterministic counter part
-    pub(crate) fn into_count(self) -> Count {
-        match self {
-            CountOrDecided::Undecided(count) => count,
-            CountOrDecided::Draw => Count {
-                draws: 1,
-                ..Count::default()
-            },
-            CountOrDecided::Win(player) => {
-                let mut count = Count::default();
-                count.report_win_for(player);
-                count
-            }
-        }
-    }
-
-    pub fn is_solved(&self) -> bool {
-        match self {
-            CountOrDecided::Win(_) | CountOrDecided::Draw => true,
-            CountOrDecided::Undecided(_) => false,
-        }
-    }
 
     /// Called during backpropagation. Updates the evaluation of a node based on a propagated delta
     /// emitted by the update of a child node. In addition to that, we can also take the evaluations
     /// of the siblings of the changed child into account. The method changes the evaluation of the
     /// current node during propagation to its new value. In additon to that it emmits a delta which
     /// in turn is passed to the update of its parent node.
-    pub fn update(
+    fn update(
         &mut self,
         sibling_evaluations: impl Iterator<Item = Option<CountOrDecided>>,
         propagated_delta: CountOrDecidedDelta,
@@ -171,7 +135,7 @@ impl CountOrDecided {
                 *self = evaluation;
                 return CountOrDecidedDelta {
                     propagated_evaluation: evaluation,
-                    previous_count
+                    previous_count,
                 };
             }
         }
@@ -225,6 +189,59 @@ impl CountOrDecided {
         };
         *self = new_eval;
         delta
+    }
+}
+
+/// Use an Upper Confidence Bound to select the next node to expand. In addition to the use of the
+/// "classic" upper confidence bound, this evaluation also features variants for states such as
+/// `Draw` and `Win`. This allows the tree search to proof the outcome of a game and turn into a
+/// weak solver. "Weak" in this context means that the solver would know if a move is a win, loss or
+/// draw, but not how many moves it takes to reach that outcome.
+///
+/// It can take a lot of memory and compute to proof the outcome of a game, so luckily you still get
+/// the counts from undecided if you decide to stop the monte carlo search before a proof is
+/// reached.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CountOrDecided {
+    /// The board has been proven to be a win for the given player, given perfect play of both
+    /// players.
+    Win(Player),
+    /// The board has been proven to be a draw, given perfect play of both players.
+    Draw,
+    /// The outcome could not yet be proven to be either a win, loss or draw.
+    Undecided(Count),
+}
+
+impl CountOrDecided {
+    /// Count of total playouts
+    pub(crate) fn total(&self) -> i32 {
+        match self {
+            CountOrDecided::Undecided(count) => count.total(),
+            CountOrDecided::Win(_) | CountOrDecided::Draw => 1,
+        }
+    }
+
+    /// Convert solved solutions to their underterministic counter part
+    pub(crate) fn into_count(self) -> Count {
+        match self {
+            CountOrDecided::Undecided(count) => count,
+            CountOrDecided::Draw => Count {
+                draws: 1,
+                ..Count::default()
+            },
+            CountOrDecided::Win(player) => {
+                let mut count = Count::default();
+                count.report_win_for(player);
+                count
+            }
+        }
+    }
+
+    pub fn is_solved(&self) -> bool {
+        match self {
+            CountOrDecided::Win(_) | CountOrDecided::Draw => true,
+            CountOrDecided::Undecided(_) => false,
+        }
     }
 }
 
