@@ -1,6 +1,6 @@
 use rand::{seq::IndexedRandom as _, Rng};
 
-use crate::{Count, CountOrDecided, Evaluation, GameState, TwoPlayerGame};
+use crate::{Count, CountOrDecided, Evaluation, GameState, Player, TwoPlayerGame};
 
 /// Used to obtain an ininitial bias for the outcome of a game starting from a given board.
 pub trait Bias<G: TwoPlayerGame> {
@@ -8,6 +8,10 @@ pub trait Bias<G: TwoPlayerGame> {
     type Evaluation: Evaluation;
 
     fn bias(&self, game: G, move_buf: &mut Vec<G::Move>, rng: &mut impl Rng) -> CountOrDecided;
+
+    /// Creating an initial evaluation for the root node, or before the first simulation. Can be
+    /// used to handle terminal states.
+    fn init_eval_from_game_state(&self, state: GameState<'_, G::Move>) -> Self::Evaluation;
 }
 
 /// Obtain an initial bias by playing random moves and reporting the outcome.
@@ -21,6 +25,15 @@ where
 
     fn bias(&self, game: G, move_buf: &mut Vec<G::Move>, rng: &mut impl Rng) -> CountOrDecided {
         CountOrDecided::Undecided(random_play(game, move_buf, rng))
+    }
+
+    fn init_eval_from_game_state(&self, state: GameState<'_, G::Move>) -> CountOrDecided {
+        match state {
+            GameState::Moves(_) => CountOrDecided::Undecided(Count::default()),
+            GameState::Draw => CountOrDecided::Draw,
+            GameState::WinPlayerOne => CountOrDecided::Win(Player::One),
+            GameState::WinPlayerTwo => CountOrDecided::Win(Player::Two),
+        }
     }
 }
 
