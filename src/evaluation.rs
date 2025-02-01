@@ -135,14 +135,17 @@ impl CountOrDecided {
         previous_child_count: Count,
         choosing_player: Player,
     ) -> CountOrDecidedDelta {
+        let previous_count = self.into_count();
         let CountOrDecidedDelta {
             propagated_evaluation,
+            previous_count: _,
         } = propagated_delta;
         if propagated_evaluation == CountOrDecided::Win(choosing_player) {
             // If it is the choosing players turn, she will choose a win
             *self = propagated_evaluation;
             return CountOrDecidedDelta {
                 propagated_evaluation,
+                previous_count,
             };
         }
         // If the choosing player is not guaranteed to win let's check if there is a draw or a loss
@@ -169,6 +172,7 @@ impl CountOrDecided {
                 *self = evaluation;
                 return CountOrDecidedDelta {
                     propagated_evaluation: evaluation,
+                    previous_count
                 };
             }
         }
@@ -208,6 +212,7 @@ impl CountOrDecided {
                     CountOrDecided::Undecided(count),
                     CountOrDecidedDelta {
                         propagated_evaluation: CountOrDecided::Undecided(propageted_count),
+                        previous_count,
                     },
                 )
             }
@@ -215,6 +220,7 @@ impl CountOrDecided {
                 *self,
                 CountOrDecidedDelta {
                     propagated_evaluation: CountOrDecided::Undecided(propageted_count),
+                    previous_count,
                 },
             ),
         };
@@ -234,10 +240,10 @@ pub struct CountOrDecidedDelta {
     /// Did the child change to a win for either player? Is it a draw? In case of undecided the
     /// count is **not** the count of the child, but the count of the change in the child.
     pub propagated_evaluation: CountOrDecided,
-    // /// The count of the child before the change. We can assume the child has been in the
-    // /// [`CountOrDecided::Undecided`] state before the change. Otherwise it would not have been
-    // /// selected for expansion.
-    // pub previous_child_count: Count,
+    /// The count of the child before the change. We can assume the child has been in the
+    /// [`CountOrDecided::Undecided`] state before the change. Otherwise it would not have been
+    /// selected for expansion.
+    pub previous_count: Count,
 }
 
 /// Counts accumulated wins, losses and draws for this part of the tree
