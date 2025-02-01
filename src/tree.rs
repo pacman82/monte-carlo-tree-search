@@ -219,18 +219,19 @@ where
 
     fn backpropagation(&mut self, node_index: usize, mut player: Player) {
         let mut delta = self.nodes[node_index].evaluation;
-        let mut current = self.nodes[node_index].parent_index();
+        let mut current_child_index = node_index;
+        let mut maybe_current_index = self.nodes[node_index].parent_index();
         // Total of child node before propagation. The original node index is the newly added leaf
         // so we can assume it to be 1. We keep track of this value going upwards, in case an
         // a solved node flips to an undecided node, to count all previous visits to the solved
         // child node as one the analogos of the solved state.
         let mut child_count = delta.into_count();
-        while let Some(current_node_index) = current {
+        while let Some(current_node_index) = maybe_current_index {
             player.flip();
 
             let (updated_evaluation, new_delta) = Self::updated_evaluation(
                 self.nodes[current_node_index].evaluation,
-                self.child_evalutations(current_node_index),
+                self.sibling_evalutations(current_node_index, current_child_index),
                 delta,
                 player,
                 child_count,
@@ -238,22 +239,34 @@ where
             delta = new_delta;
             let node = &mut self.nodes[current_node_index];
             child_count = node.evaluation.into_count();
+            current_child_index = current_node_index;
             node.evaluation = updated_evaluation;
-            current = node.parent_index();
+            maybe_current_index = node.parent_index();
         }
     }
 
-    /// All evaluations of the children of the given node. If a child is not yet explored, the
-    /// evaluation will be `None`.
-    fn child_evalutations(
+    /// All evaluations of the siblings of the given child node. If a sibling is not yet explored,
+    /// the evaluation will be `None`.
+    /// 
+    /// # Parameters
+    /// 
+    /// * `parent_index` - Parent of all the siblings and the child
+    /// * `child_index` - Index of the child node. Must be a child of the node pointed to by
+    ///   `parent_index`. The child will excluded from the items of the iterator.
+    fn sibling_evalutations(
         &self,
-        node_index: usize,
+        parent_index: usize,
+        child_index: usize,
     ) -> impl Iterator<Item = Option<CountOrDecided>> + '_ {
-        self.child_links(node_index).map(move |link| {
+        self.child_links(parent_index).filter_map(move |link| {
             if link.is_explored() {
-                Some(self.nodes[link.child].evaluation)
+                if link.child == child_index {
+                    None
+                } else {
+                    Some(Some(self.nodes[link.child].evaluation))
+                }
             } else {
-                None
+                Some(None)
             }
         })
     }
@@ -270,7 +283,7 @@ where
     /// loosing node.
     fn updated_evaluation(
         previous_evaluation: CountOrDecided,
-        child_evaluations: impl Iterator<Item = Option<CountOrDecided>>,
+        sibling_evaluations: impl Iterator<Item = Option<CountOrDecided>>,
         propagated_evaluation: CountOrDecided,
         choosing_player: Player,
         previous_child_count: Count,
@@ -282,8 +295,8 @@ where
         // If the choosing player is not guaranteed to win let's check if there is a draw or a loss
         let loss = CountOrDecided::Win(choosing_player.opponent());
         if propagated_evaluation.is_solved() {
-            let mut acc = Some(loss);
-            for maybe_eval in child_evaluations {
+            let mut acc = Some(propagated_evaluation);
+            for maybe_eval in sibling_evaluations {
                 let Some(child_eval) = maybe_eval else {
                     // Still has unexplored children, so we can not be sure the current node is a
                     // draw or a loss.
