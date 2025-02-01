@@ -7,7 +7,7 @@ use crate::Player;
 
 /// Controls what information is stored for each board remembered in the nodes of the tree, how
 /// to change it during backpropagation and what criteria to use to select the next node to expand.
-pub trait Evaluation{
+pub trait Evaluation {
     /// Define an ordering between two evaluations, so that the greates value is the most favorable
     /// move for the given player. This method is currently used by [`crate::Tree`] in order to
     /// update the best move found so far after each playout.
@@ -15,14 +15,10 @@ pub trait Evaluation{
 
     /// A weight used to decide how much we want to explore this node, compared to its siblings.
     /// Higher weightns make a node more likely to be selected.
-    fn selection_weight(
-        &self,
-        parent_eval: &Self,
-        selecting_player: Player,
-    ) -> f32;
+    fn selection_weight(&self, parent_eval: &Self, selecting_player: Player) -> f32;
 }
 
-impl Evaluation for CountOrDecided{
+impl Evaluation for CountOrDecided {
     fn cmp_for(&self, other: &CountOrDecided, player: Player) -> Ordering {
         match (self, other) {
             (CountOrDecided::Win(p1), CountOrDecided::Win(p2)) => {
@@ -59,11 +55,7 @@ impl Evaluation for CountOrDecided{
         }
     }
 
-    fn selection_weight(
-        &self,
-        parent_eval: &CountOrDecided,
-        selecting_player: Player,
-    ) -> f32 {
+    fn selection_weight(&self, parent_eval: &CountOrDecided, selecting_player: Player) -> f32 {
         let total_visits_parent = parent_eval.total() as f32;
         match self {
             CountOrDecided::Undecided(count) => count.ucb(total_visits_parent, selecting_player),
@@ -84,7 +76,7 @@ impl Evaluation for CountOrDecided{
 /// `Draw` and `Win`. This allows the tree search to proof the outcome of a game and turn into a
 /// weak solver. "Weak" in this context means that the solver would know if a move is a win, loss or
 /// draw, but not how many moves it takes to reach that outcome.
-/// 
+///
 /// It can take a lot of memory and compute to proof the outcome of a game, so luckily you still get
 /// the counts from undecided if you decide to stop the monte carlo search before a proof is
 /// reached.
@@ -128,6 +120,92 @@ impl CountOrDecided {
         match self {
             CountOrDecided::Win(_) | CountOrDecided::Draw => true,
             CountOrDecided::Undecided(_) => false,
+        }
+    }
+
+    /// Update the evaluation of a node with the propagated evaluation.
+    ///
+    /// # Return
+    ///
+    /// First element is the evaluation of the node specified in node_index. The second element is
+    /// the delta which should be propagated to its parent node. How can these differ? Usually the
+    /// two are identical, but consider a situation in which we learn that a node is a proofen loss
+    /// for the choosing player given perfect play of both players. Yet all of its siblings are
+    /// draws. In such a situation we would propagate the draw, but still asign the loss to the
+    /// loosing node.
+    pub fn updated_evaluation(
+        &self,
+        sibling_evaluations: impl Iterator<Item = Option<CountOrDecided>>,
+        propagated_evaluation: CountOrDecided,
+        previous_child_count: Count,
+        choosing_player: Player,
+    ) -> (CountOrDecided, CountOrDecided) {
+        if propagated_evaluation == CountOrDecided::Win(choosing_player) {
+            // If it is the choosing players turn, she will choose a win
+            return (propagated_evaluation, propagated_evaluation);
+        }
+        // If the choosing player is not guaranteed to win let's check if there is a draw or a loss
+        let loss = CountOrDecided::Win(choosing_player.opponent());
+        if propagated_evaluation.is_solved() {
+            let mut acc = Some(propagated_evaluation);
+            for maybe_eval in sibling_evaluations {
+                let Some(child_eval) = maybe_eval else {
+                    // Still has unexplored children, so we can not be sure the current node is a
+                    // draw or a loss.
+                    acc = None;
+                    break;
+                };
+                if child_eval == CountOrDecided::Draw {
+                    // Found a draw, so we can be sure its not a loss
+                    acc = Some(CountOrDecided::Draw);
+                } else if child_eval != loss {
+                    // Found a child neither draw or loss, so we can not rule out a victory yet
+                    acc = None;
+                    break;
+                }
+            }
+            if let Some(evaluation) = acc {
+                return (evaluation, evaluation);
+            }
+        }
+        // No deterministic outcome, let's propagete the counts
+        let propageted_count = match propagated_evaluation {
+            CountOrDecided::Win(Player::One) => {
+                let mut count = Count {
+                    wins_player_one: previous_child_count.total() + propagated_evaluation.total(),
+                    ..Default::default()
+                };
+                count -= previous_child_count;
+                count
+            }
+            CountOrDecided::Win(Player::Two) => {
+                let mut count = Count {
+                    wins_player_two: previous_child_count.total() + propagated_evaluation.total(),
+                    ..Default::default()
+                };
+                count -= previous_child_count;
+                count
+            }
+            CountOrDecided::Draw => {
+                let mut count = Count {
+                    draws: previous_child_count.total() + propagated_evaluation.total(),
+                    ..Default::default()
+                };
+                count -= previous_child_count;
+                count
+            }
+            CountOrDecided::Undecided(count) => count,
+        };
+
+        match self {
+            CountOrDecided::Undecided(mut count) => {
+                count += propageted_count;
+                (
+                    CountOrDecided::Undecided(count),
+                    CountOrDecided::Undecided(propageted_count),
+                )
+            }
+            _ => (*self, CountOrDecided::Undecided(propageted_count)),
         }
     }
 }
@@ -205,7 +283,7 @@ impl SubAssign for Count {
 mod test {
     use std::cmp::Ordering;
 
-    use crate::{Count, Evaluation as _, Player, CountOrDecided};
+    use crate::{Count, CountOrDecided, Evaluation as _, Player};
 
     #[test]
     fn compare_evaluations() {

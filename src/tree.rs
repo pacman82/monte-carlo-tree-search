@@ -2,7 +2,7 @@ use std::cmp::Ordering;
 
 use rand::{seq::IndexedRandom as _, Rng};
 
-use crate::{evaluation::CountOrDecided, Bias, Count, Evaluation, Player, TwoPlayerGame};
+use crate::{evaluation::CountOrDecided, Bias, Evaluation, Player, TwoPlayerGame};
 
 /// A tree there the nodes represent game states and the links represent moves. The tree does only
 /// store the root game state and reconstruct the nodes based on the moves. It does store an
@@ -229,13 +229,14 @@ where
         while let Some(current_node_index) = maybe_current_index {
             player.flip();
 
-            let (updated_evaluation, new_delta) = Self::updated_evaluation(
-                self.nodes[current_node_index].evaluation,
-                self.sibling_evalutations(current_node_index, current_child_index),
-                delta,
-                player,
-                child_count,
-            );
+            let (updated_evaluation, new_delta) = self.nodes[current_node_index]
+                .evaluation
+                .updated_evaluation(
+                    self.sibling_evalutations(current_node_index, current_child_index),
+                    delta,
+                    child_count,
+                    player,
+                );
             delta = new_delta;
             let node = &mut self.nodes[current_node_index];
             child_count = node.evaluation.into_count();
@@ -247,9 +248,9 @@ where
 
     /// All evaluations of the siblings of the given child node. If a sibling is not yet explored,
     /// the evaluation will be `None`.
-    /// 
+    ///
     /// # Parameters
-    /// 
+    ///
     /// * `parent_index` - Parent of all the siblings and the child
     /// * `child_index` - Index of the child node. Must be a child of the node pointed to by
     ///   `parent_index`. The child will excluded from the items of the iterator.
@@ -269,95 +270,6 @@ where
                 Some(None)
             }
         })
-    }
-
-    /// Update the evaluation of a node with the propagated evaluation.
-    ///
-    /// # Return
-    ///
-    /// First element is the evaluation of the node specified in node_index. The second element is
-    /// the delta which should be propagated to its parent node. How can these differ? Usually the
-    /// two are identical, but consider a situation in which we learn that a node is a proofen loss
-    /// for the choosing player given perfect play of both players. Yet all of its siblings are
-    /// draws. In such a situation we would propagate the draw, but still asign the loss to the
-    /// loosing node.
-    fn updated_evaluation(
-        previous_evaluation: CountOrDecided,
-        sibling_evaluations: impl Iterator<Item = Option<CountOrDecided>>,
-        propagated_evaluation: CountOrDecided,
-        choosing_player: Player,
-        previous_child_count: Count,
-    ) -> (CountOrDecided, CountOrDecided) {
-        if propagated_evaluation == CountOrDecided::Win(choosing_player) {
-            // If it is the choosing players turn, she will choose a win
-            return (propagated_evaluation, propagated_evaluation);
-        }
-        // If the choosing player is not guaranteed to win let's check if there is a draw or a loss
-        let loss = CountOrDecided::Win(choosing_player.opponent());
-        if propagated_evaluation.is_solved() {
-            let mut acc = Some(propagated_evaluation);
-            for maybe_eval in sibling_evaluations {
-                let Some(child_eval) = maybe_eval else {
-                    // Still has unexplored children, so we can not be sure the current node is a
-                    // draw or a loss.
-                    acc = None;
-                    break;
-                };
-                if child_eval == CountOrDecided::Draw {
-                    // Found a draw, so we can be sure its not a loss
-                    acc = Some(CountOrDecided::Draw);
-                } else if child_eval != loss {
-                    // Found a child neither draw or loss, so we can not rule out a victory yet
-                    acc = None;
-                    break;
-                }
-            }
-            if let Some(evaluation) = acc {
-                return (evaluation, evaluation);
-            }
-        }
-        // No deterministic outcome, let's propagete the counts
-        let propageted_count = match propagated_evaluation {
-            CountOrDecided::Win(Player::One) => {
-                let mut count = Count {
-                    wins_player_one: previous_child_count.total() + propagated_evaluation.total(),
-                    ..Default::default()
-                };
-                count -= previous_child_count;
-                count
-            }
-            CountOrDecided::Win(Player::Two) => {
-                let mut count = Count {
-                    wins_player_two: previous_child_count.total() + propagated_evaluation.total(),
-                    ..Default::default()
-                };
-                count -= previous_child_count;
-                count
-            }
-            CountOrDecided::Draw => {
-                let mut count = Count {
-                    draws: previous_child_count.total() + propagated_evaluation.total(),
-                    ..Default::default()
-                };
-                count -= previous_child_count;
-                count
-            }
-            CountOrDecided::Undecided(count) => count,
-        };
-
-        match previous_evaluation {
-            CountOrDecided::Undecided(mut count) => {
-                count += propageted_count;
-                (
-                    CountOrDecided::Undecided(count),
-                    CountOrDecided::Undecided(propageted_count),
-                )
-            }
-            _ => (
-                previous_evaluation,
-                CountOrDecided::Undecided(propageted_count),
-            ),
-        }
     }
 
     /// `true` if the node has at least one child which is not explored yet.

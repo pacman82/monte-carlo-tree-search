@@ -1,6 +1,6 @@
 use rand::{seq::IndexedRandom as _, Rng};
 
-use crate::{Count, Evaluation, GameState, TwoPlayerGame, CountOrDecided};
+use crate::{Count, CountOrDecided, Evaluation, GameState, TwoPlayerGame};
 
 /// Used to obtain an ininitial bias for the outcome of a game starting from a given board.
 pub trait Bias<G: TwoPlayerGame> {
