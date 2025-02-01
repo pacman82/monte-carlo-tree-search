@@ -35,6 +35,9 @@ pub trait Evaluation: Copy {
     /// Solved states will be ignored during selection phase. If there are no unsolved nodes left
     /// in the tree the search will stop.
     fn is_solved(&self) -> bool;
+
+    /// Initial delto for backpropagation based on the bias found for the new node.
+    fn initial_delta(&self) -> Self::Delta;
 }
 
 impl Evaluation for CountOrDecided {
@@ -199,6 +202,13 @@ impl Evaluation for CountOrDecided {
         match self {
             CountOrDecided::Win(_) | CountOrDecided::Draw => true,
             CountOrDecided::Undecided(_) => false,
+        }
+    }
+
+    fn initial_delta(&self) -> Self::Delta {
+        CountOrDecidedDelta {
+            propagated_evaluation: *self,
+            previous_count: Count::default(),
         }
     }
 }

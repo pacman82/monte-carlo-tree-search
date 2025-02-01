@@ -12,7 +12,6 @@ pub trait Bias<G: TwoPlayerGame> {
     /// Evaluation given to unexplored nodes for the purpose of choosing the best node from root.
     fn unexplored(&self) -> Self::Evaluation;
 
-
     // init_eval_from_game_state should probably be moved to the Evaluation trait. In this scenario,
     // also think about how to handle hitting terminal states during move selection.
 

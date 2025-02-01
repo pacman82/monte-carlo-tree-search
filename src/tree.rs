@@ -2,9 +2,7 @@ use std::cmp::Ordering;
 
 use rand::{seq::IndexedRandom as _, Rng};
 
-use crate::{
-    evaluation::CountOrDecided, Bias, CountOrDecidedDelta, Evaluation, Player, TwoPlayerGame,
-};
+use crate::{Bias, Evaluation, Player, TwoPlayerGame};
 
 /// A tree there the nodes represent game states and the links represent moves. The tree does only
 /// store the root game state and reconstruct the nodes based on the moves. It does store an
@@ -67,6 +65,39 @@ where
             best_link,
             bias,
         }
+    }
+
+    pub fn with_playouts(game: G, bias: B, num_playouts: u32, rng: &mut impl Rng) -> Self {
+        let mut tree = Self::new(game, bias);
+        for _ in 0..num_playouts {
+            if !tree.playout(rng) {
+                break;
+            }
+        }
+        tree
+    }
+
+    /// Playout one cycle of selection, expansion, simulation and backpropagation. `true` if the
+    /// playout may have changed the evaluation of the root, `false` if the game is already solved.
+    pub fn playout(&mut self, rng: &mut impl Rng) -> bool {
+        let Some((to_be_expanded_index, mut game)) = self.select_unexplored_node() else {
+            return false;
+        };
+        // Create a new child node for the selected node and let `game` represent its state
+        let new_node_index = self.expand(to_be_expanded_index, &mut game, rng);
+
+        // Player whom gets to choose the next turn in the board the (new) leaf node represents.
+        let player = game.current_player();
+
+        // If the game is not in a terminal state, start a simulation to gain an initial estimate
+        if !self.nodes[new_node_index].evaluation.is_solved() {
+            let bias = self.bias.bias(game, &mut self.move_buf, rng);
+            self.nodes[new_node_index].evaluation = bias;
+        }
+
+        self.backpropagation(new_node_index, player);
+        self.update_best_link();
+        true
     }
 
     /// Picks one of the best moves for the current player. `None` if the root node has no children.
@@ -181,12 +212,8 @@ where
         new_node_index
     }
 
-    fn backpropagation(
-        &mut self,
-        node_index: usize,
-        mut delta: <B::Evaluation as Evaluation>::Delta,
-        mut player: Player,
-    ) {
+    fn backpropagation(&mut self, node_index: usize, mut player: Player) {
+        let mut delta = self.nodes[node_index].evaluation.initial_delta();
         let mut current_child_index = node_index;
         let mut maybe_current_index = self.nodes[node_index].parent_index();
         while let Some(current_node_index) = maybe_current_index {
@@ -284,49 +311,6 @@ where
         self.links[node.children_begin..node.children_end]
             .iter()
             .copied()
-    }
-}
-
-impl<G, B> Tree<G, B>
-where
-    G: TwoPlayerGame,
-    B: Bias<G, Evaluation = CountOrDecided>,
-{
-    pub fn with_playouts(game: G, bias: B, num_playouts: u32, rng: &mut impl Rng) -> Self {
-        let mut tree = Self::new(game, bias);
-        for _ in 0..num_playouts {
-            if !tree.playout(rng) {
-                break;
-            }
-        }
-        tree
-    }
-
-    /// Playout one cycle of selection, expansion, simulation and backpropagation. `true` if the
-    /// playout may have changed the evaluation of the root, `false` if the game is already solved.
-    pub fn playout(&mut self, rng: &mut impl Rng) -> bool {
-        let Some((to_be_expanded_index, mut game)) = self.select_unexplored_node() else {
-            return false;
-        };
-        // Create a new child node for the selected node and let `game` represent its state
-        let new_node_index = self.expand(to_be_expanded_index, &mut game, rng);
-
-        // Player whom gets to choose the next turn in the board the (new) leaf node represents.
-        let player = game.current_player();
-
-        // If the game is not in a terminal state, start a simulation to gain an initial estimate
-        if !self.nodes[new_node_index].evaluation.is_solved() {
-            let bias = self.bias.bias(game, &mut self.move_buf, rng);
-            self.nodes[new_node_index].evaluation = bias;
-        }
-
-        let delta = CountOrDecidedDelta {
-            propagated_evaluation: self.nodes[new_node_index].evaluation,
-            previous_count: self.nodes[new_node_index].evaluation.into_count(),
-        };
-        self.backpropagation(new_node_index, delta, player);
-        self.update_best_link();
-        true
     }
 }
 
