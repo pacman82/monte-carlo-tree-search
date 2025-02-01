@@ -132,13 +132,12 @@ impl CountOrDecided {
         &mut self,
         sibling_evaluations: impl Iterator<Item = Option<CountOrDecided>>,
         propagated_delta: CountOrDecidedDelta,
-        previous_child_count: Count,
         choosing_player: Player,
     ) -> CountOrDecidedDelta {
         let previous_count = self.into_count();
         let CountOrDecidedDelta {
             propagated_evaluation,
-            previous_count: _,
+            previous_count: previous_child_count,
         } = propagated_delta;
         if propagated_evaluation == CountOrDecided::Win(choosing_player) {
             // If it is the choosing players turn, she will choose a win
