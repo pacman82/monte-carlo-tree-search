@@ -123,26 +123,22 @@ impl CountOrDecided {
         }
     }
 
-    /// Update the evaluation of a node with the propagated evaluation.
-    ///
-    /// # Return
-    ///
-    /// First element is the evaluation of the node specified in node_index. The second element is
-    /// the delta which should be propagated to its parent node. How can these differ? Usually the
-    /// two are identical, but consider a situation in which we learn that a node is a proofen loss
-    /// for the choosing player given perfect play of both players. Yet all of its siblings are
-    /// draws. In such a situation we would propagate the draw, but still asign the loss to the
-    /// loosing node.
-    pub fn updated_evaluation(
-        &self,
+    /// Called during backpropagation. Updates the evaluation of a node based on a propagated delta
+    /// emitted by the update of a child node. In addition to that, we can also take the evaluations
+    /// of the siblings of the changed child into account. The method changes the evaluation of the
+    /// current node during propagation to its new value. In additon to that it emmits a delta which
+    /// in turn is passed to the update of its parent node.
+    pub fn update(
+        &mut self,
         sibling_evaluations: impl Iterator<Item = Option<CountOrDecided>>,
         propagated_evaluation: CountOrDecided,
         previous_child_count: Count,
         choosing_player: Player,
-    ) -> (CountOrDecided, CountOrDecided) {
+    ) -> CountOrDecided {
         if propagated_evaluation == CountOrDecided::Win(choosing_player) {
             // If it is the choosing players turn, she will choose a win
-            return (propagated_evaluation, propagated_evaluation);
+            *self = propagated_evaluation;
+            return propagated_evaluation;
         }
         // If the choosing player is not guaranteed to win let's check if there is a draw or a loss
         let loss = CountOrDecided::Win(choosing_player.opponent());
@@ -165,7 +161,8 @@ impl CountOrDecided {
                 }
             }
             if let Some(evaluation) = acc {
-                return (evaluation, evaluation);
+                *self = evaluation;
+                return evaluation;
             }
         }
         // No deterministic outcome, let's propagete the counts
@@ -197,7 +194,7 @@ impl CountOrDecided {
             CountOrDecided::Undecided(count) => count,
         };
 
-        match self {
+        let (new_eval, delta) = match self {
             CountOrDecided::Undecided(mut count) => {
                 count += propageted_count;
                 (
@@ -206,7 +203,9 @@ impl CountOrDecided {
                 )
             }
             _ => (*self, CountOrDecided::Undecided(propageted_count)),
-        }
+        };
+        *self = new_eval;
+        delta
     }
 }
 
