@@ -22,10 +22,10 @@ pub trait Evaluation{
     ) -> f32;
 }
 
-impl Evaluation for CountWithDecided{
-    fn cmp_for(&self, other: &CountWithDecided, player: Player) -> Ordering {
+impl Evaluation for CountOrDecided{
+    fn cmp_for(&self, other: &CountOrDecided, player: Player) -> Ordering {
         match (self, other) {
-            (CountWithDecided::Win(p1), CountWithDecided::Win(p2)) => {
+            (CountOrDecided::Win(p1), CountOrDecided::Win(p2)) => {
                 if *p1 == *p2 {
                     Ordering::Equal
                 } else if *p1 == player {
@@ -34,25 +34,25 @@ impl Evaluation for CountWithDecided{
                     Ordering::Less
                 }
             }
-            (CountWithDecided::Win(p1), _) => {
+            (CountOrDecided::Win(p1), _) => {
                 if *p1 == player {
                     Ordering::Greater
                 } else {
                     Ordering::Less
                 }
             }
-            (CountWithDecided::Draw, CountWithDecided::Win(p2)) => {
+            (CountOrDecided::Draw, CountOrDecided::Win(p2)) => {
                 if *p2 == player {
                     Ordering::Less
                 } else {
                     Ordering::Greater
                 }
             }
-            (CountWithDecided::Draw, CountWithDecided::Draw) => Ordering::Equal,
-            (CountWithDecided::Draw, CountWithDecided::Undecided(count)) => {
+            (CountOrDecided::Draw, CountOrDecided::Draw) => Ordering::Equal,
+            (CountOrDecided::Draw, CountOrDecided::Undecided(count)) => {
                 0.5.partial_cmp(&count.reward(player)).unwrap()
             }
-            (CountWithDecided::Undecided(c1), CountWithDecided::Undecided(c2)) => {
+            (CountOrDecided::Undecided(c1), CountOrDecided::Undecided(c2)) => {
                 c1.reward(player).partial_cmp(&c2.reward(player)).unwrap()
             }
             (a, b) => b.cmp_for(a, player).reverse(),
@@ -61,14 +61,14 @@ impl Evaluation for CountWithDecided{
 
     fn selection_weight(
         &self,
-        parent_eval: &CountWithDecided,
+        parent_eval: &CountOrDecided,
         selecting_player: Player,
     ) -> f32 {
         let total_visits_parent = parent_eval.total() as f32;
         match self {
-            CountWithDecided::Undecided(count) => count.ucb(total_visits_parent, selecting_player),
-            CountWithDecided::Draw => 0.5,
-            CountWithDecided::Win(winning_player) => {
+            CountOrDecided::Undecided(count) => count.ucb(total_visits_parent, selecting_player),
+            CountOrDecided::Draw => 0.5,
+            CountOrDecided::Win(winning_player) => {
                 if selecting_player == *winning_player {
                     f32::MAX
                 } else {
@@ -89,7 +89,7 @@ impl Evaluation for CountWithDecided{
 /// the counts from undecided if you decide to stop the monte carlo search before a proof is
 /// reached.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum CountWithDecided {
+pub enum CountOrDecided {
     /// The board has been proven to be a win for the given player, given perfect play of both
     /// players.
     Win(Player),
@@ -99,24 +99,24 @@ pub enum CountWithDecided {
     Undecided(Count),
 }
 
-impl CountWithDecided {
+impl CountOrDecided {
     /// Count of total playouts
     pub(crate) fn total(&self) -> i32 {
         match self {
-            CountWithDecided::Undecided(count) => count.total(),
-            CountWithDecided::Win(_) | CountWithDecided::Draw => 1,
+            CountOrDecided::Undecided(count) => count.total(),
+            CountOrDecided::Win(_) | CountOrDecided::Draw => 1,
         }
     }
 
     /// Convert solved solutions to their underterministic counter part
     pub(crate) fn into_count(self) -> Count {
         match self {
-            CountWithDecided::Undecided(count) => count,
-            CountWithDecided::Draw => Count {
+            CountOrDecided::Undecided(count) => count,
+            CountOrDecided::Draw => Count {
                 draws: 1,
                 ..Count::default()
             },
-            CountWithDecided::Win(player) => {
+            CountOrDecided::Win(player) => {
                 let mut count = Count::default();
                 count.report_win_for(player);
                 count
@@ -126,13 +126,13 @@ impl CountWithDecided {
 
     pub fn is_solved(&self) -> bool {
         match self {
-            CountWithDecided::Win(_) | CountWithDecided::Draw => true,
-            CountWithDecided::Undecided(_) => false,
+            CountOrDecided::Win(_) | CountOrDecided::Draw => true,
+            CountOrDecided::Undecided(_) => false,
         }
     }
 }
 
-impl Default for CountWithDecided {
+impl Default for CountOrDecided {
     fn default() -> Self {
         Self::Undecided(Count::default())
     }
@@ -205,13 +205,13 @@ impl SubAssign for Count {
 mod test {
     use std::cmp::Ordering;
 
-    use crate::{Count, Evaluation as _, Player, CountWithDecided};
+    use crate::{Count, Evaluation as _, Player, CountOrDecided};
 
     #[test]
     fn compare_evaluations() {
-        let win_player_one = CountWithDecided::Win(Player::One);
-        let win_player_two = CountWithDecided::Win(Player::Two);
-        let draw = CountWithDecided::Draw;
+        let win_player_one = CountOrDecided::Win(Player::One);
+        let win_player_two = CountOrDecided::Win(Player::Two);
+        let draw = CountOrDecided::Draw;
         let one = Player::One;
         let two = Player::Two;
 
@@ -231,7 +231,7 @@ mod test {
         assert_eq!(draw.cmp_for(&draw, one), Ordering::Equal);
         assert_eq!(
             draw.cmp_for(
-                &CountWithDecided::Undecided(Count {
+                &CountOrDecided::Undecided(Count {
                     draws: 1,
                     ..Count::default()
                 }),
@@ -241,7 +241,7 @@ mod test {
         );
         assert_eq!(
             draw.cmp_for(
-                &CountWithDecided::Undecided(Count {
+                &CountOrDecided::Undecided(Count {
                     wins_player_one: 1,
                     ..Count::default()
                 }),
@@ -250,7 +250,7 @@ mod test {
             Ordering::Less
         );
         assert_eq!(
-            CountWithDecided::Undecided(Count {
+            CountOrDecided::Undecided(Count {
                 wins_player_one: 1,
                 ..Count::default()
             })
@@ -258,7 +258,7 @@ mod test {
             Ordering::Less
         );
         assert_eq!(
-            CountWithDecided::Undecided(Count {
+            CountOrDecided::Undecided(Count {
                 wins_player_two: 1,
                 ..Count::default()
             })
@@ -266,12 +266,12 @@ mod test {
             Ordering::Greater
         );
         assert_eq!(
-            CountWithDecided::Undecided(Count {
+            CountOrDecided::Undecided(Count {
                 wins_player_one: 1,
                 ..Count::default()
             })
             .cmp_for(
-                &CountWithDecided::Undecided(Count {
+                &CountOrDecided::Undecided(Count {
                     wins_player_two: 1,
                     ..Count::default()
                 }),

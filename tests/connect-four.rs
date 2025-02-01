@@ -5,7 +5,7 @@ use std::{
 
 use connect_four_solver::{Column, Solver};
 use monte_carlo_tree_search::{
-    Bias, Count, CountWithDecided, GameState, Player, RandomPlayoutBias, Tree, TwoPlayerGame,
+    Bias, Count, CountOrDecided, GameState, Player, RandomPlayoutBias, Tree, TwoPlayerGame,
 };
 use rand::{rngs::StdRng, seq::IndexedRandom as _, Rng, SeedableRng};
 
@@ -28,7 +28,7 @@ fn start_from_terminal_position() {
     let game = ConnectFour::from_move_list("1212121");
     let tree = Tree::new(game, RandomPlayoutBias);
 
-    assert_eq!(CountWithDecided::Win(Player::One), tree.evaluation());
+    assert_eq!(CountOrDecided::Win(Player::One), tree.evaluation());
 }
 
 /// Position occured once letting the tree play against itself, for some reason the solver did not
@@ -75,7 +75,7 @@ fn position_42442445555772222514171() {
     print_move_statistics(&tree);
     assert!(tree
         .eval_by_move()
-        .all(|(_move, eval)| eval == CountWithDecided::Win(Player::One)));
+        .all(|(_move, eval)| eval == CountOrDecided::Win(Player::One)));
     assert_eq!(Column::from_index(0), tree.best_move().unwrap());
 }
 
@@ -151,7 +151,7 @@ fn solve_connect_four() {
 
     let tree = Tree::with_playouts(game, ConnectFourBias, num_playouts, &mut rng);
 
-    assert_eq!(CountWithDecided::Win(Player::One), tree.evaluation());
+    assert_eq!(CountOrDecided::Win(Player::One), tree.evaluation());
 }
 
 fn print_move_statistics<B>(tree: &Tree<ConnectFour, B>) {
@@ -221,24 +221,24 @@ impl TwoPlayerGame for ConnectFour {
 struct ConnectFourBias;
 
 impl Bias<ConnectFour> for ConnectFourBias {
-    type Evaluation = CountWithDecided;
+    type Evaluation = CountOrDecided;
 
     fn bias(
         &self,
         mut game: ConnectFour,
         move_buf: &mut Vec<Column>,
         rng: &mut impl Rng,
-    ) -> CountWithDecided {
+    ) -> CountOrDecided {
         // Check for terminal position. Actually this should never be used, as bias should only be
         // invoked on non-terminal positions.
         debug_assert!(!game.0.is_victory());
         // If the current player can win in the next move, we can deterministically say that this
         // board evaluates to a win for this player.
         if game.0.can_win_in_next_move() {
-            return CountWithDecided::Win(game.current_player());
+            return CountOrDecided::Win(game.current_player());
         }
         if game.0.non_loosing_moves().next().is_none() {
-            return CountWithDecided::Win(game.current_player().opponent());
+            return CountOrDecided::Win(game.current_player().opponent());
         }
         loop {
             match game.state(move_buf) {
@@ -247,7 +247,7 @@ impl Bias<ConnectFour> for ConnectFourBias {
                     unreachable!("Should have detected winning move beforehand")
                 }
                 GameState::Draw => {
-                    return CountWithDecided::Undecided(Count {
+                    return CountOrDecided::Undecided(Count {
                         draws: 1,
                         ..Count::default()
                     })
@@ -256,7 +256,7 @@ impl Bias<ConnectFour> for ConnectFourBias {
             if game.0.can_win_in_next_move() {
                 let mut count = Count::default();
                 count.report_win_for(game.current_player());
-                return CountWithDecided::Undecided(count);
+                return CountOrDecided::Undecided(count);
             }
             move_buf.clear();
             move_buf.extend(game.0.non_loosing_moves());
@@ -266,7 +266,7 @@ impl Bias<ConnectFour> for ConnectFourBias {
                 // No move available which would not allow our opponent to win, so we loose.
                 let mut count = Count::default();
                 count.report_win_for(game.current_player().opponent());
-                return CountWithDecided::Undecided(count);
+                return CountOrDecided::Undecided(count);
             }
         }
     }
