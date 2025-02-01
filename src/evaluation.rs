@@ -131,14 +131,19 @@ impl CountOrDecided {
     pub fn update(
         &mut self,
         sibling_evaluations: impl Iterator<Item = Option<CountOrDecided>>,
-        propagated_evaluation: CountOrDecided,
+        propagated_delta: CountOrDecidedDelta,
         previous_child_count: Count,
         choosing_player: Player,
-    ) -> CountOrDecided {
+    ) -> CountOrDecidedDelta {
+        let CountOrDecidedDelta {
+            propagated_evaluation,
+        } = propagated_delta;
         if propagated_evaluation == CountOrDecided::Win(choosing_player) {
             // If it is the choosing players turn, she will choose a win
             *self = propagated_evaluation;
-            return propagated_evaluation;
+            return CountOrDecidedDelta {
+                propagated_evaluation,
+            };
         }
         // If the choosing player is not guaranteed to win let's check if there is a draw or a loss
         let loss = CountOrDecided::Win(choosing_player.opponent());
@@ -162,7 +167,9 @@ impl CountOrDecided {
             }
             if let Some(evaluation) = acc {
                 *self = evaluation;
-                return evaluation;
+                return CountOrDecidedDelta {
+                    propagated_evaluation: evaluation,
+                };
             }
         }
         // No deterministic outcome, let's propagete the counts
@@ -199,10 +206,17 @@ impl CountOrDecided {
                 count += propageted_count;
                 (
                     CountOrDecided::Undecided(count),
-                    CountOrDecided::Undecided(propageted_count),
+                    CountOrDecidedDelta {
+                        propagated_evaluation: CountOrDecided::Undecided(propageted_count),
+                    },
                 )
             }
-            _ => (*self, CountOrDecided::Undecided(propageted_count)),
+            _ => (
+                *self,
+                CountOrDecidedDelta {
+                    propagated_evaluation: CountOrDecided::Undecided(propageted_count),
+                },
+            ),
         };
         *self = new_eval;
         delta
@@ -213,6 +227,17 @@ impl Default for CountOrDecided {
     fn default() -> Self {
         Self::Undecided(Count::default())
     }
+}
+
+/// Delta propagated upwards from child to parent during backpropagation.
+pub struct CountOrDecidedDelta {
+    /// Did the child change to a win for either player? Is it a draw? In case of undecided the
+    /// count is **not** the count of the child, but the count of the change in the child.
+    pub propagated_evaluation: CountOrDecided,
+    // /// The count of the child before the change. We can assume the child has been in the
+    // /// [`CountOrDecided::Undecided`] state before the change. Otherwise it would not have been
+    // /// selected for expansion.
+    // pub previous_child_count: Count,
 }
 
 /// Counts accumulated wins, losses and draws for this part of the tree
