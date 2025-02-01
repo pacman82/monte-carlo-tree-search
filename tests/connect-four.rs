@@ -154,7 +154,10 @@ fn solve_connect_four() {
     assert_eq!(CountOrDecided::Win(Player::One), tree.evaluation());
 }
 
-fn print_move_statistics<B>(tree: &Tree<ConnectFour, B>) {
+fn print_move_statistics<B>(tree: &Tree<ConnectFour, B>)
+where
+    B: Bias<ConnectFour, Evaluation = CountOrDecided>,
+{
     let evals = tree.eval_by_move().collect::<Vec<_>>();
     for (mv, eval) in evals {
         eprintln!("Move: {:?} Eval: {:?}", mv, eval,);
@@ -279,7 +282,7 @@ fn use_tree_to_generate_move<B>(
     rng: &mut impl Rng,
 ) -> Column
 where
-    B: Bias<ConnectFour>,
+    B: Bias<ConnectFour, Evaluation = CountOrDecided>,
 {
     let tree = Tree::with_playouts(ConnectFour(game), bias, num_playouts, rng);
     eprintln!("nodes: {} links: {}", tree.num_nodes(), tree.num_links());

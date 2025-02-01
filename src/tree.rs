@@ -9,12 +9,12 @@ use crate::{
 /// A tree there the nodes represent game states and the links represent moves. The tree does only
 /// store the root game state and reconstruct the nodes based on the moves. It does store an
 /// evaluation for each node though. The evaluation is updated during each playout.
-pub struct Tree<G: TwoPlayerGame, B> {
+pub struct Tree<G: TwoPlayerGame, B: Bias<G>> {
     /// Game state of the root node.
     game: G,
     /// We store all the nodes of the tree in a vector to avoid allocations. We refer to the nodes
     /// using indices.
-    nodes: Vec<Node>,
+    nodes: Vec<Node<B::Evaluation>>,
     /// Since we want to support Nodes with arbitrary many links, we store the links in their own
     /// vector. Each node will have a range in this vector indicated by a start and end index. We
     /// use usize::Max to indicate, that the node is not expanded yet.
@@ -41,7 +41,7 @@ pub struct Tree<G: TwoPlayerGame, B> {
 impl<G, B> Tree<G, B>
 where
     G: TwoPlayerGame,
-    B: Bias<G>,
+    B: Bias<G, Evaluation = CountOrDecided>,
 {
     pub fn new(game: G, bias: B) -> Self {
         let mut move_buf = Vec::new();
@@ -280,12 +280,7 @@ where
             .iter()
             .copied()
     }
-}
 
-impl<G, B> Tree<G, B>
-where
-    G: TwoPlayerGame,
-{
     /// Count of playouts of the root node.
     pub fn evaluation(&self) -> CountOrDecided {
         self.nodes[0].evaluation
@@ -325,7 +320,7 @@ where
 }
 
 #[derive(Debug)]
-struct Node {
+struct Node<E> {
     /// Index of the parent node. The root node will be set to `usize::MAX`.
     parent: usize,
     /// Index into `Tree::links` where the children of this node start. `0` if the node does not
@@ -335,15 +330,15 @@ struct Node {
     /// of the next node would start, i.e. `children_begin + num_children`. `0` if the node does not
     /// have children.
     children_end: usize,
-    evaluation: CountOrDecided,
+    evaluation: E,
 }
 
-impl Node {
+impl<E> Node<E> {
     fn new(
         parent: usize,
         children_begin: usize,
         children_end: usize,
-        estimated_outcome: CountOrDecided,
+        estimated_outcome: E,
     ) -> Self {
         Self {
             parent,
