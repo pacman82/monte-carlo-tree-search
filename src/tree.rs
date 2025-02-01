@@ -229,19 +229,17 @@ where
         while let Some(current_node_index) = maybe_current_index {
             player.flip();
 
-            let (updated_evaluation, new_delta) = self.nodes[current_node_index]
-                .evaluation
-                .updated_evaluation(
-                    self.sibling_evalutations(current_node_index, current_child_index),
-                    delta,
-                    child_count,
-                    player,
-                );
-            delta = new_delta;
+            let mut current_evaluation = self.nodes[current_node_index].evaluation;
+            delta = current_evaluation.update(
+                self.sibling_evalutations(current_node_index, current_child_index),
+                delta,
+                child_count,
+                player,
+            );
             let node = &mut self.nodes[current_node_index];
             child_count = node.evaluation.into_count();
             current_child_index = current_node_index;
-            node.evaluation = updated_evaluation;
+            node.evaluation = current_evaluation;
             maybe_current_index = node.parent_index();
         }
     }
