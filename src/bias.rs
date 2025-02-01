@@ -7,7 +7,7 @@ pub trait Bias<G: TwoPlayerGame> {
     /// The type of evaluation returned by the bias.
     type Evaluation: Evaluation;
 
-    fn bias(&self, game: G, move_buf: &mut Vec<G::Move>, rng: &mut impl Rng) -> CountOrDecided;
+    fn bias(&mut self, game: G, move_buf: &mut Vec<G::Move>, rng: &mut impl Rng) -> CountOrDecided;
 
     /// Evaluation given to unexplored nodes for the purpose of choosing the best node from root.
     fn unexplored(&self) -> Self::Evaluation;
@@ -30,7 +30,7 @@ where
 {
     type Evaluation = CountOrDecided;
 
-    fn bias(&self, game: G, move_buf: &mut Vec<G::Move>, rng: &mut impl Rng) -> CountOrDecided {
+    fn bias(&mut self, game: G, move_buf: &mut Vec<G::Move>, rng: &mut impl Rng) -> CountOrDecided {
         CountOrDecided::Undecided(random_play(game, move_buf, rng))
     }
 

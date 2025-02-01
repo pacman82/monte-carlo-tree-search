@@ -1,6 +1,5 @@
 use std::{
-    fmt::{self, Display},
-    io::Write,
+    cmp::Ordering, fmt::{self, Display}, io::Write
 };
 
 use connect_four_solver::{Column, Solver};
@@ -147,10 +146,10 @@ fn play_against_yourself() {
 fn solve_connect_four() {
     let mut rng = StdRng::seed_from_u64(42);
     let game = ConnectFour::new();
-    let num_playouts = 100_000_000;
+    let num_playouts = 1_000;
 
-    let tree = Tree::with_playouts(game, ConnectFourBias, num_playouts, &mut rng);
-
+    let tree = Tree::with_playouts(game, PerfectBias::new(), num_playouts, &mut rng);
+    print_move_statistics(&tree);
     assert_eq!(CountOrDecided::Win(Player::One), tree.evaluation());
 }
 
@@ -227,7 +226,7 @@ impl Bias<ConnectFour> for ConnectFourBias {
     type Evaluation = CountOrDecided;
 
     fn bias(
-        &self,
+        &mut self,
         mut game: ConnectFour,
         move_buf: &mut Vec<Column>,
         rng: &mut impl Rng,
@@ -286,6 +285,59 @@ impl Bias<ConnectFour> for ConnectFourBias {
     fn unexplored(&self) -> Self::Evaluation {
         CountOrDecided::Undecided(Count::default())
     }
+}
+
+/// Uses a perfect solver to generate a bias. We use this to explore how much good bias can help to
+/// cut down the number of playouts needed to solve the game, in the best case. However to not make
+/// this trivial, the bias will report its finding as undecided, so the tree will still do the
+/// solving, yet guided by the best possible intuition.
+struct PerfectBias {
+    solver: Solver,
+}
+
+impl PerfectBias {
+    pub fn new() -> Self {
+        PerfectBias {
+            solver: Solver::new(),
+        }
+    }
+}
+
+impl Bias<ConnectFour> for PerfectBias {
+    type Evaluation = CountOrDecided;
+    
+    fn bias(&mut self, game: ConnectFour, _move_buf: &mut Vec<Column>, _: &mut impl Rng) -> CountOrDecided {
+        let score = self.solver.score(&game.0);
+        let current = game.current_player();
+        match score.cmp(&0) {
+            Ordering::Equal => CountOrDecided::Undecided(Count { draws: 1, ..Default::default() }),
+            Ordering::Greater => {
+                let mut count = Count::default();
+                count.report_win_for(current);
+                CountOrDecided::Undecided(count)
+            }
+            Ordering::Less => {
+                let mut count = Count::default();
+                count.report_win_for(current.opponent());
+                CountOrDecided::Undecided(count)
+            }
+        }
+    }
+    
+    fn unexplored(&self) -> Self::Evaluation {
+        CountOrDecided::Undecided(Count::default())
+    }
+    
+    fn init_eval_from_game_state(&self, state: GameState<'_, <ConnectFour as TwoPlayerGame>::Move>) -> Self::Evaluation {
+        match state {
+            GameState::Moves(_) => CountOrDecided::Undecided(Count::default()),
+            GameState::Draw => CountOrDecided::Draw,
+            GameState::WinPlayerOne => CountOrDecided::Win(Player::One),
+            GameState::WinPlayerTwo => CountOrDecided::Win(Player::Two),
+        }
+    }
+
+    
 }
 
 fn use_tree_to_generate_move<B>(
