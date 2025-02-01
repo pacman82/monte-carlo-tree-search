@@ -70,7 +70,6 @@ fn position_42442445555772222514171() {
     //  1 2 3 4 5 6 7
 
     let mut rng = StdRng::seed_from_u64(42);
-    // 1000 playouts are not enough to prove every move is a loss for `O`.
     let num_playouts = 1000;
     let tree = Tree::with_playouts(game, RandomPlayoutBias, num_playouts, &mut rng);
     print_move_statistics(&tree);

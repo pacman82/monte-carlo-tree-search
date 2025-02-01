@@ -14,6 +14,7 @@ pub trait Evaluation{
     fn cmp_for(&self, other: &Self, player: Player) -> Ordering;
 
     /// A weight used to decide how much we want to explore this node, compared to its siblings.
+    /// Higher weightns make a node more likely to be selected.
     fn selection_weight(
         &self,
         parent_eval: &Self,
