@@ -1,13 +1,13 @@
 use rand::{seq::IndexedRandom as _, Rng};
 
-use crate::{Count, Evaluation, GameState, TwoPlayerGame, CountWithDecided};
+use crate::{Count, Evaluation, GameState, TwoPlayerGame, CountOrDecided};
 
 /// Used to obtain an ininitial bias for the outcome of a game starting from a given board.
 pub trait Bias<G: TwoPlayerGame> {
     /// The type of evaluation returned by the bias.
     type Evaluation: Evaluation;
 
-    fn bias(&self, game: G, move_buf: &mut Vec<G::Move>, rng: &mut impl Rng) -> CountWithDecided;
+    fn bias(&self, game: G, move_buf: &mut Vec<G::Move>, rng: &mut impl Rng) -> CountOrDecided;
 }
 
 /// Obtain an initial bias by playing random moves and reporting the outcome.
@@ -17,10 +17,10 @@ impl<G> Bias<G> for RandomPlayoutBias
 where
     G: TwoPlayerGame,
 {
-    type Evaluation = CountWithDecided;
+    type Evaluation = CountOrDecided;
 
-    fn bias(&self, game: G, move_buf: &mut Vec<G::Move>, rng: &mut impl Rng) -> CountWithDecided {
-        CountWithDecided::Undecided(random_play(game, move_buf, rng))
+    fn bias(&self, game: G, move_buf: &mut Vec<G::Move>, rng: &mut impl Rng) -> CountOrDecided {
+        CountOrDecided::Undecided(random_play(game, move_buf, rng))
     }
 }
 

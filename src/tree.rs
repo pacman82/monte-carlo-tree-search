@@ -2,7 +2,7 @@ use std::cmp::Ordering;
 
 use rand::{seq::IndexedRandom as _, Rng};
 
-use crate::{evaluation::CountWithDecided, Bias, Count, Evaluation, Player, TwoPlayerGame};
+use crate::{evaluation::CountOrDecided, Bias, Count, Evaluation, Player, TwoPlayerGame};
 
 /// A tree there the nodes represent game states and the links represent moves. The tree does only
 /// store the root game state and reconstruct the nodes based on the moves. It does store an
@@ -119,12 +119,12 @@ where
     }
 
     /// Evaluation of a node the link directs to. Handles unexplored nodes.
-    fn evaluation_by_link_index(&self, link_index: usize) -> CountWithDecided {
+    fn evaluation_by_link_index(&self, link_index: usize) -> CountOrDecided {
         let link = self.links[link_index];
         if link.is_explored() {
             self.nodes[link.child].evaluation
         } else {
-            CountWithDecided::default()
+            CountOrDecided::default()
         }
     }
 
@@ -229,7 +229,7 @@ where
             player.flip();
 
             let (updated_evaluation, new_delta) = self.updated_evaluation(
-                current_node_index,
+                self.nodes[current_node_index].evaluation,
                 self.child_evalutations(current_node_index),
                 delta,
                 player,
@@ -248,7 +248,7 @@ where
     fn child_evalutations(
         &self,
         node_index: usize,
-    ) -> impl Iterator<Item = Option<CountWithDecided>> + '_ {
+    ) -> impl Iterator<Item = Option<CountOrDecided>> + '_ {
         self.child_links(node_index).map(move |link| {
             if link.is_explored() {
                 Some(self.nodes[link.child].evaluation)
@@ -270,19 +270,18 @@ where
     /// loosing node.
     fn updated_evaluation(
         &self,
-        node_index: usize,
-        child_evaluations: impl Iterator<Item = Option<CountWithDecided>>,
-        propagated_evaluation: CountWithDecided,
+        previous_evaluation: CountOrDecided,
+        child_evaluations: impl Iterator<Item = Option<CountOrDecided>>,
+        propagated_evaluation: CountOrDecided,
         choosing_player: Player,
         previous_child_count: Count,
-    ) -> (CountWithDecided, CountWithDecided) {
-        let old_evaluation = self.nodes[node_index].evaluation;
-        if propagated_evaluation == CountWithDecided::Win(choosing_player) {
+    ) -> (CountOrDecided, CountOrDecided) {
+        if propagated_evaluation == CountOrDecided::Win(choosing_player) {
             // If it is the choosing players turn, she will choose a win
             return (propagated_evaluation, propagated_evaluation);
         }
         // If the choosing player is not guaranteed to win let's check if there is a draw or a loss
-        let loss = CountWithDecided::Win(choosing_player.opponent());
+        let loss = CountOrDecided::Win(choosing_player.opponent());
         if propagated_evaluation.is_solved() {
             let mut acc = Some(loss);
             for maybe_eval in child_evaluations {
@@ -292,9 +291,9 @@ where
                     acc = None;
                     break;
                 };
-                if child_eval == CountWithDecided::Draw {
+                if child_eval == CountOrDecided::Draw {
                     // Found a draw, so we can be sure its not a loss
-                    acc = Some(CountWithDecided::Draw);
+                    acc = Some(CountOrDecided::Draw);
                 } else if child_eval != loss {
                     // Found a child neither draw or loss, so we can not rule out a victory yet
                     acc = None;
@@ -307,7 +306,7 @@ where
         }
         // No deterministic outcome, let's propagete the counts
         let propageted_count = match propagated_evaluation {
-            CountWithDecided::Win(Player::One) => {
+            CountOrDecided::Win(Player::One) => {
                 let mut count = Count {
                     wins_player_one: previous_child_count.total() + propagated_evaluation.total(),
                     ..Default::default()
@@ -315,7 +314,7 @@ where
                 count -= previous_child_count;
                 count
             }
-            CountWithDecided::Win(Player::Two) => {
+            CountOrDecided::Win(Player::Two) => {
                 let mut count = Count {
                     wins_player_two: previous_child_count.total() + propagated_evaluation.total(),
                     ..Default::default()
@@ -323,7 +322,7 @@ where
                 count -= previous_child_count;
                 count
             }
-            CountWithDecided::Draw => {
+            CountOrDecided::Draw => {
                 let mut count = Count {
                     draws: previous_child_count.total() + propagated_evaluation.total(),
                     ..Default::default()
@@ -331,20 +330,20 @@ where
                 count -= previous_child_count;
                 count
             }
-            CountWithDecided::Undecided(count) => count,
+            CountOrDecided::Undecided(count) => count,
         };
 
-        match old_evaluation {
-            CountWithDecided::Undecided(mut count) => {
+        match previous_evaluation {
+            CountOrDecided::Undecided(mut count) => {
                 count += propageted_count;
                 (
-                    CountWithDecided::Undecided(count),
-                    CountWithDecided::Undecided(propageted_count),
+                    CountOrDecided::Undecided(count),
+                    CountOrDecided::Undecided(propageted_count),
                 )
             }
             _ => (
-                old_evaluation,
-                CountWithDecided::Undecided(propageted_count),
+                previous_evaluation,
+                CountOrDecided::Undecided(propageted_count),
             ),
         }
     }
@@ -368,11 +367,11 @@ where
     G: TwoPlayerGame,
 {
     /// Count of playouts of the root node.
-    pub fn evaluation(&self) -> CountWithDecided {
+    pub fn evaluation(&self) -> CountOrDecided {
         self.nodes[0].evaluation
     }
 
-    pub fn eval_by_move(&self) -> impl Iterator<Item = (G::Move, CountWithDecided)> + '_ {
+    pub fn eval_by_move(&self) -> impl Iterator<Item = (G::Move, CountOrDecided)> + '_ {
         let root = &self.nodes[0];
         self.links[root.children_begin..root.children_end]
             .iter()
@@ -381,7 +380,7 @@ where
                     let child = &self.nodes[link.child];
                     (link.move_, child.evaluation)
                 } else {
-                    (link.move_, CountWithDecided::default())
+                    (link.move_, CountOrDecided::default())
                 }
             })
     }
@@ -416,7 +415,7 @@ struct Node {
     /// of the next node would start, i.e. `children_begin + num_children`. `0` if the node does not
     /// have children.
     children_end: usize,
-    evaluation: CountWithDecided,
+    evaluation: CountOrDecided,
 }
 
 impl Node {
@@ -424,7 +423,7 @@ impl Node {
         parent: usize,
         children_begin: usize,
         children_end: usize,
-        estimated_outcome: CountWithDecided,
+        estimated_outcome: CountOrDecided,
     ) -> Self {
         Self {
             parent,

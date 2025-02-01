@@ -1,7 +1,7 @@
 use std::ops::{Deref, DerefMut};
 
 use monte_carlo_tree_search::{
-    CountWithDecided, GameState, Player, RandomPlayoutBias, Tree, TwoPlayerGame,
+    CountOrDecided, GameState, Player, RandomPlayoutBias, Tree, TwoPlayerGame,
 };
 use rand::{rngs::StdRng, SeedableRng as _};
 use tic_tac_toe_board::{CellIndex, TicTacToeState};
@@ -39,7 +39,7 @@ fn backpropagation_of_draw() {
     game.play_move(&best_move);
 
     print_move_statistics(&tree);
-    assert_eq!(CountWithDecided::Draw, tree.evaluation());
+    assert_eq!(CountOrDecided::Draw, tree.evaluation());
 }
 
 #[test]
@@ -55,7 +55,7 @@ fn solve_tic_tac_toe() {
     eprintln!("nodes: {} links: {}", tree.num_nodes(), tree.num_links());
     print_move_statistics(&tree);
 
-    assert_eq!(CountWithDecided::Draw, tree.evaluation());
+    assert_eq!(CountOrDecided::Draw, tree.evaluation());
 }
 
 #[test]
@@ -140,7 +140,7 @@ fn report_win_if_initialized_with_terminal_position() {
     let num_playouts = 1;
     let tree = Tree::with_playouts(game, RandomPlayoutBias, num_playouts, &mut rng);
 
-    assert_eq!(CountWithDecided::Win(Player::One), tree.evaluation())
+    assert_eq!(CountOrDecided::Win(Player::One), tree.evaluation())
 }
 
 #[test]
@@ -170,7 +170,7 @@ fn solve_draw_in_one_move() {
     let tree = Tree::with_playouts(game, RandomPlayoutBias, num_playouts, &mut rng);
 
     print_move_statistics(&tree);
-    assert_eq!(CountWithDecided::Draw, tree.evaluation());
+    assert_eq!(CountOrDecided::Draw, tree.evaluation());
     assert_eq!(CellIndex::new(8), tree.best_move().unwrap())
 }
 
@@ -200,7 +200,7 @@ fn solve_draw_in_two_moves() {
     let tree = Tree::with_playouts(game, RandomPlayoutBias, num_playouts, &mut rng);
 
     print_move_statistics(&tree);
-    assert_eq!(CountWithDecided::Draw, tree.evaluation());
+    assert_eq!(CountOrDecided::Draw, tree.evaluation());
     assert_eq!(CellIndex::new(5), tree.best_move().unwrap())
 }
 
@@ -229,7 +229,7 @@ fn solve_draw_in_three_moves() {
     let tree = Tree::with_playouts(game, RandomPlayoutBias, num_playouts, &mut rng);
 
     print_move_statistics(&tree);
-    assert_eq!(CountWithDecided::Draw, tree.evaluation());
+    assert_eq!(CountOrDecided::Draw, tree.evaluation());
 }
 
 #[test]
@@ -255,7 +255,7 @@ fn solve_win_in_one_move() {
     let num_playouts = 3;
     let tree = Tree::with_playouts(game, RandomPlayoutBias, num_playouts, &mut rng);
 
-    assert_eq!(CountWithDecided::Win(Player::One), tree.evaluation());
+    assert_eq!(CountOrDecided::Win(Player::One), tree.evaluation());
     assert_eq!(CellIndex::new(3), tree.best_move().unwrap())
 }
 
@@ -281,7 +281,7 @@ fn solve_defeat_in_two_moves() {
     let num_playouts = 15;
     let tree = Tree::with_playouts(game, RandomPlayoutBias, num_playouts, &mut rng);
 
-    assert_eq!(CountWithDecided::Win(Player::One), tree.evaluation());
+    assert_eq!(CountOrDecided::Win(Player::One), tree.evaluation());
     print_move_statistics(&tree);
 }
 
@@ -305,7 +305,7 @@ fn solve_win_in_five_moves() {
     let tree = Tree::with_playouts(game, RandomPlayoutBias, num_playouts, &mut rng);
 
     print_move_statistics(&tree);
-    assert_eq!(CountWithDecided::Win(Player::One), tree.evaluation());
+    assert_eq!(CountOrDecided::Win(Player::One), tree.evaluation());
 }
 
 /// With few or zero playouts, we can be in a situation, there not all nodes of the root are
