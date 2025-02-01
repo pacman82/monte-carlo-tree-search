@@ -2,7 +2,9 @@ use std::cmp::Ordering;
 
 use rand::{seq::IndexedRandom as _, Rng};
 
-use crate::{evaluation::CountOrDecided, Bias, Evaluation, Player, TwoPlayerGame};
+use crate::{
+    evaluation::CountOrDecided, Bias, CountOrDecidedDelta, Evaluation, Player, TwoPlayerGame,
+};
 
 /// A tree there the nodes represent game states and the links represent moves. The tree does only
 /// store the root game state and reconstruct the nodes based on the moves. It does store an
@@ -218,14 +220,16 @@ where
     }
 
     fn backpropagation(&mut self, node_index: usize, mut player: Player) {
-        let mut delta = self.nodes[node_index].evaluation;
+        let mut delta = CountOrDecidedDelta {
+            propagated_evaluation: self.nodes[node_index].evaluation,
+        };
         let mut current_child_index = node_index;
         let mut maybe_current_index = self.nodes[node_index].parent_index();
         // Total of child node before propagation. The original node index is the newly added leaf
         // so we can assume it to be 1. We keep track of this value going upwards, in case an
         // a solved node flips to an undecided node, to count all previous visits to the solved
         // child node as one the analogos of the solved state.
-        let mut child_count = delta.into_count();
+        let mut child_count = delta.propagated_evaluation.into_count();
         while let Some(current_node_index) = maybe_current_index {
             player.flip();
 
