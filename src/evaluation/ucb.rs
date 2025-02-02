@@ -4,13 +4,13 @@ use crate::Player;
 
 /// Counts accumulated wins, losses and draws for this part of the tree
 #[derive(Default, Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Count {
+pub struct Ucb {
     pub wins_player_one: i32,
     pub wins_player_two: i32,
     pub draws: i32,
 }
 
-impl Count {
+impl Ucb {
     /// A value between 0 and 1 indicating, how rewarding this outcome is for the given player. 0
     /// indicates a loss, 1 a win and 0.5 a draw. However 0.5 could also indicate an outcome which
     /// is very undecided and poses and advantage for neither player. The reward function does
@@ -49,7 +49,7 @@ impl Count {
     }
 }
 
-impl AddAssign for Count {
+impl AddAssign for Ucb {
     fn add_assign(&mut self, other: Self) {
         self.wins_player_one += other.wins_player_one;
         self.wins_player_two += other.wins_player_two;
@@ -57,7 +57,7 @@ impl AddAssign for Count {
     }
 }
 
-impl SubAssign for Count {
+impl SubAssign for Ucb {
     fn sub_assign(&mut self, other: Self) {
         self.wins_player_one -= other.wins_player_one;
         self.wins_player_two -= other.wins_player_two;

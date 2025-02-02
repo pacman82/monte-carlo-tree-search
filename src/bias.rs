@@ -1,6 +1,6 @@
 use rand::{seq::IndexedRandom as _, Rng};
 
-use crate::{Count, UcbSolver, Evaluation, GameState, TwoPlayerGame};
+use crate::{Ucb, UcbSolver, Evaluation, GameState, TwoPlayerGame};
 
 /// Used to obtain an ininitial bias for the outcome of a game starting from a given board.
 pub trait Bias<G: TwoPlayerGame> {
@@ -27,13 +27,13 @@ where
     }
 
     fn unexplored(&self) -> UcbSolver {
-        UcbSolver::Undecided(Count::default())
+        UcbSolver::Undecided(Ucb::default())
     }
 }
 
 /// Play random moves, until the game is over and report the score from the perspective of the
 /// player whose turn it is.
-pub fn random_play<G>(mut game: G, moves_buf: &mut Vec<G::Move>, rng: &mut impl Rng) -> Count
+pub fn random_play<G>(mut game: G, moves_buf: &mut Vec<G::Move>, rng: &mut impl Rng) -> Ucb
 where
     G: TwoPlayerGame,
 {
@@ -44,21 +44,21 @@ where
                 game.play(selected_move)
             }
             GameState::WinPlayerOne => {
-                break Count {
+                break Ucb {
                     wins_player_one: 1,
                     wins_player_two: 0,
                     draws: 0,
                 }
             }
             GameState::WinPlayerTwo => {
-                break Count {
+                break Ucb {
                     wins_player_one: 0,
                     wins_player_two: 1,
                     draws: 0,
                 }
             }
             GameState::Draw => {
-                break Count {
+                break Ucb {
                     wins_player_one: 0,
                     wins_player_two: 0,
                     draws: 1,
