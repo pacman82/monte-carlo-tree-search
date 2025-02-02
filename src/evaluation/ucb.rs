@@ -1,6 +1,8 @@
-use std::ops::{AddAssign, SubAssign};
+use std::{cmp::Ordering, ops::{AddAssign, SubAssign}};
 
-use crate::Player;
+use crate::{GameState, Player};
+
+use super::Evaluation;
 
 /// Counts accumulated wins, losses and draws for this part of the tree
 #[derive(Default, Clone, Copy, Debug, PartialEq, Eq)]
@@ -62,5 +64,56 @@ impl SubAssign for Ucb {
         self.wins_player_one -= other.wins_player_one;
         self.wins_player_two -= other.wins_player_two;
         self.draws -= other.draws;
+    }
+}
+
+impl Evaluation for Ucb {
+    type Delta = Ucb;
+
+    fn cmp_for(&self, other: &Self, player: Player) -> Ordering {
+        self.reward(player).partial_cmp(&other.reward(player)).unwrap()
+    }
+
+    fn selection_weight(&self, parent_eval: &Self, selecting_player: Player) -> f32 {
+        self.ucb(parent_eval.total() as f32, selecting_player)
+    }
+
+    fn update(
+        &mut self,
+        _sibling_evaluations_: impl Iterator<Item = Option<Self>>,
+        propagated_delta: Self::Delta,
+        _choosing_player: Player,
+    ) -> Self::Delta {
+        *self += propagated_delta;
+        propagated_delta
+    }
+
+    fn is_solved(&self) -> bool {
+        false
+    }
+
+    fn initial_delta(&self) -> Self::Delta {
+        *self
+    }
+
+    fn init_from_game_state<M>(state: &GameState<'_, M>) -> Self {
+        match state {
+            GameState::WinPlayerOne => Ucb {
+                wins_player_one: 1,
+                wins_player_two: 0,
+                draws: 0,
+            },
+            GameState::WinPlayerTwo => Ucb {
+                wins_player_one: 0,
+                wins_player_two: 1,
+                draws: 0,
+            },
+            GameState::Draw => Ucb {
+                wins_player_one: 0,
+                wins_player_two: 0,
+                draws: 1,
+            },
+            GameState::Moves(_) => Ucb::default(),
+        }
     }
 }
