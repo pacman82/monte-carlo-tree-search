@@ -43,7 +43,7 @@ where
 {
     pub fn new(game: G, bias: B) -> Self {
         let mut move_buf = Vec::new();
-        let estimated_outcome = bias.init_eval_from_game_state(game.state(&mut move_buf));
+        let estimated_outcome = B::Evaluation::init_from_game_state(&game.state(&mut move_buf));
         let root = Node::new(usize::MAX, 0, move_buf.len(), estimated_outcome);
         let nodes = vec![root];
         let links: Vec<_> = move_buf
@@ -197,7 +197,7 @@ where
         link.child = new_node_index;
         let grandchildren_begin = self.links.len();
         let grandchildren_end = grandchildren_begin + new_node_game_state.moves().len();
-        let eval = self.bias.init_eval_from_game_state(new_node_game_state);
+        let eval = B::Evaluation::init_from_game_state(&new_node_game_state);
         self.links.extend(self.move_buf.drain(..).map(|move_| Link {
             child: usize::MAX,
             move_,

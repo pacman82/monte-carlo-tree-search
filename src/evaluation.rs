@@ -3,7 +3,7 @@ use std::{
     ops::{AddAssign, SubAssign},
 };
 
-use crate::Player;
+use crate::{GameState, Player};
 
 /// Controls what information is stored for each board remembered in the nodes of the tree, how
 /// to change it during backpropagation and what criteria to use to select the next node to expand.
@@ -38,6 +38,10 @@ pub trait Evaluation: Copy {
 
     /// Initial delto for backpropagation based on the bias found for the new node.
     fn initial_delta(&self) -> Self::Delta;
+
+    /// Creating an initial evaluation for the root node, or before the first simulation. Can be
+    /// used to handle terminal states.
+    fn init_from_game_state<M>(state: &GameState<'_, M>) -> Self;
 }
 
 impl Evaluation for CountOrDecided {
@@ -209,6 +213,15 @@ impl Evaluation for CountOrDecided {
         CountOrDecidedDelta {
             propagated_evaluation: *self,
             previous_count: Count::default(),
+        }
+    }
+    
+    fn init_from_game_state<M>(state: &GameState<'_, M>) -> Self {
+        match state {
+            GameState::Moves(_) => CountOrDecided::Undecided(Count::default()),
+            GameState::Draw => CountOrDecided::Draw,
+            GameState::WinPlayerOne => CountOrDecided::Win(Player::One),
+            GameState::WinPlayerTwo => CountOrDecided::Win(Player::Two),
         }
     }
 }

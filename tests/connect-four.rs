@@ -273,15 +273,6 @@ impl Bias<ConnectFour> for ConnectFourBias {
         }
     }
 
-    fn init_eval_from_game_state(&self, state: GameState<'_, Column>) -> Self::Evaluation {
-        match state {
-            GameState::Moves(_) => CountOrDecided::Undecided(Count::default()),
-            GameState::Draw => CountOrDecided::Draw,
-            GameState::WinPlayerOne => CountOrDecided::Win(Player::One),
-            GameState::WinPlayerTwo => CountOrDecided::Win(Player::Two),
-        }
-    }
-
     fn unexplored(&self) -> Self::Evaluation {
         CountOrDecided::Undecided(Count::default())
     }
@@ -326,18 +317,7 @@ impl Bias<ConnectFour> for PerfectBias {
     
     fn unexplored(&self) -> Self::Evaluation {
         CountOrDecided::Undecided(Count::default())
-    }
-    
-    fn init_eval_from_game_state(&self, state: GameState<'_, <ConnectFour as TwoPlayerGame>::Move>) -> Self::Evaluation {
-        match state {
-            GameState::Moves(_) => CountOrDecided::Undecided(Count::default()),
-            GameState::Draw => CountOrDecided::Draw,
-            GameState::WinPlayerOne => CountOrDecided::Win(Player::One),
-            GameState::WinPlayerTwo => CountOrDecided::Win(Player::Two),
-        }
-    }
-
-    
+    }    
 }
 
 fn use_tree_to_generate_move<B>(
