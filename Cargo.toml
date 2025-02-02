@@ -2,6 +2,9 @@
 name = "monte-carlo-tree-search"
 version = "0.1.0"
 edition = "2021"
+license = "MIT"
+description = "Monte Carlo Tree Search to find good moves in two player games."
+repository = "https://github.com/pacman82/odbc-api"
 
 [dependencies]
 rand = "0.9.0"
