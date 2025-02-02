@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 license = "MIT"
 description = "Monte Carlo Tree Search to find good moves in two player games."
-repository = "https://github.com/pacman82/odbc-api"
+repository = "https://github.com/pacman82/monte-carlo-tree-search"
 
 [dependencies]
 rand = "0.9.0"
