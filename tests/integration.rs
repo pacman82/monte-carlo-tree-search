@@ -1,5 +1,5 @@
 use monte_carlo_tree_search::{
-    UcbSolver, GameState, Player, RandomPlayoutBias, Tree, TwoPlayerGame,
+    UcbSolver, GameState, Player, RandomPlayoutUcbSolver, Tree, TwoPlayerGame,
 };
 
 #[test]
@@ -25,7 +25,7 @@ fn player_one_always_wins() {
 
     let game = PlayerOneAlwaysWins;
 
-    let tree = Tree::new(game, RandomPlayoutBias);
+    let tree = Tree::new(game, RandomPlayoutUcbSolver);
 
     assert_eq!(UcbSolver::Win(Player::One), tree.evaluation());
 }

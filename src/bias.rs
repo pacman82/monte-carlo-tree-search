@@ -13,10 +13,24 @@ pub trait Bias<G: TwoPlayerGame> {
     fn unexplored(&self) -> Self::Evaluation;
 }
 
-/// Obtain an initial bias by playing random moves and reporting the outcome.
-pub struct RandomPlayoutBias;
+pub struct RandomPlayoutUcb;
 
-impl<G> Bias<G> for RandomPlayoutBias
+impl<G> Bias<G> for RandomPlayoutUcb where G: TwoPlayerGame {
+    type Evaluation = Ucb;
+
+    fn bias(&mut self, game: G, move_buf: &mut Vec<G::Move>, rng: &mut impl Rng) -> Ucb {
+        random_play(game, move_buf, rng)
+    }
+
+    fn unexplored(&self) -> Ucb {
+        Ucb::default()
+    }
+}
+
+/// Obtain an initial bias by playing random moves and reporting the outcome.
+pub struct RandomPlayoutUcbSolver;
+
+impl<G> Bias<G> for RandomPlayoutUcbSolver
 where
     G: TwoPlayerGame,
 {

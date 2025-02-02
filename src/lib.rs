@@ -5,7 +5,7 @@ mod tree;
 mod two_player_game;
 
 pub use self::{
-    bias::{random_play, Bias, RandomPlayoutBias},
+    bias::{random_play, Bias, RandomPlayoutUcbSolver, RandomPlayoutUcb},
     evaluation::{Ucb, UcbSolver, CountOrDecidedDelta, Evaluation},
     player::Player,
     tree::Tree,

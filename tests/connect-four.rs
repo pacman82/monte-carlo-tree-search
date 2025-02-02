@@ -4,7 +4,7 @@ use std::{
 
 use connect_four_solver::{Column, Solver};
 use monte_carlo_tree_search::{
-    Bias, Ucb, UcbSolver, GameState, Player, RandomPlayoutBias, Tree, TwoPlayerGame,
+    Bias, Ucb, UcbSolver, GameState, Player, RandomPlayoutUcbSolver, Tree, TwoPlayerGame,
 };
 use rand::{rngs::StdRng, seq::IndexedRandom as _, Rng, SeedableRng};
 
@@ -14,7 +14,7 @@ fn play_move_connect_four() {
     let game = ConnectFour::new();
     let num_playouts = 100;
 
-    let tree = Tree::with_playouts(game, RandomPlayoutBias, num_playouts, &mut rng);
+    let tree = Tree::with_playouts(game, RandomPlayoutUcbSolver, num_playouts, &mut rng);
 
     for (move_, eval) in tree.eval_by_move() {
         eprintln!("Eval child {:?}: {:?} ", move_, eval,);
@@ -25,7 +25,7 @@ fn play_move_connect_four() {
 fn start_from_terminal_position() {
     // First player has won
     let game = ConnectFour::from_move_list("1212121");
-    let tree = Tree::new(game, RandomPlayoutBias);
+    let tree = Tree::new(game, RandomPlayoutUcbSolver);
 
     assert_eq!(UcbSolver::Win(Player::One), tree.evaluation());
 }
@@ -47,7 +47,7 @@ fn position_424424455557722225141717() {
 
     let mut rng = StdRng::seed_from_u64(42);
     let num_playouts = 1_000;
-    let tree = Tree::with_playouts(game, RandomPlayoutBias, num_playouts, &mut rng);
+    let tree = Tree::with_playouts(game, RandomPlayoutUcbSolver, num_playouts, &mut rng);
     print_move_statistics(&tree);
     assert_eq!(Column::from_index(0), tree.best_move().unwrap());
 }
@@ -70,7 +70,7 @@ fn position_42442445555772222514171() {
 
     let mut rng = StdRng::seed_from_u64(42);
     let num_playouts = 1000;
-    let tree = Tree::with_playouts(game, RandomPlayoutBias, num_playouts, &mut rng);
+    let tree = Tree::with_playouts(game, RandomPlayoutUcbSolver, num_playouts, &mut rng);
     print_move_statistics(&tree);
     assert!(tree
         .eval_by_move()
@@ -128,7 +128,7 @@ fn play_against_yourself() {
         } else {
             // Player Two
             eprintln!("Player Two");
-            let bias = RandomPlayoutBias;
+            let bias = RandomPlayoutUcbSolver;
             let num_playouts = 100_000;
             use_tree_to_generate_move(game, num_playouts, bias, &mut rng)
         };
