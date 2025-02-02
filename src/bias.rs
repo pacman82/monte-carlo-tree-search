@@ -1,6 +1,6 @@
 use rand::{seq::IndexedRandom as _, Rng};
 
-use crate::{Count, CountOrDecided, Evaluation, GameState, TwoPlayerGame};
+use crate::{Count, UcbSolver, Evaluation, GameState, TwoPlayerGame};
 
 /// Used to obtain an ininitial bias for the outcome of a game starting from a given board.
 pub trait Bias<G: TwoPlayerGame> {
@@ -20,14 +20,14 @@ impl<G> Bias<G> for RandomPlayoutBias
 where
     G: TwoPlayerGame,
 {
-    type Evaluation = CountOrDecided;
+    type Evaluation = UcbSolver;
 
-    fn bias(&mut self, game: G, move_buf: &mut Vec<G::Move>, rng: &mut impl Rng) -> CountOrDecided {
-        CountOrDecided::Undecided(random_play(game, move_buf, rng))
+    fn bias(&mut self, game: G, move_buf: &mut Vec<G::Move>, rng: &mut impl Rng) -> UcbSolver {
+        UcbSolver::Undecided(random_play(game, move_buf, rng))
     }
 
-    fn unexplored(&self) -> CountOrDecided {
-        CountOrDecided::Undecided(Count::default())
+    fn unexplored(&self) -> UcbSolver {
+        UcbSolver::Undecided(Count::default())
     }
 }
 

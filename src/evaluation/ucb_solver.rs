@@ -14,7 +14,7 @@ use super::{Count, Evaluation};
 /// the counts from undecided if you decide to stop the monte carlo search before a proof is
 /// reached.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum CountOrDecided {
+pub enum UcbSolver {
     /// The board has been proven to be a win for the given player, given perfect play of both
     /// players.
     Win(Player),
@@ -24,24 +24,24 @@ pub enum CountOrDecided {
     Undecided(Count),
 }
 
-impl CountOrDecided {
+impl UcbSolver {
     /// Count of total playouts
     pub(crate) fn total(&self) -> i32 {
         match self {
-            CountOrDecided::Undecided(count) => count.total(),
-            CountOrDecided::Win(_) | CountOrDecided::Draw => 1,
+            UcbSolver::Undecided(count) => count.total(),
+            UcbSolver::Win(_) | UcbSolver::Draw => 1,
         }
     }
 
     /// Convert solved solutions to their underterministic counter part
     pub(crate) fn into_count(self) -> Count {
         match self {
-            CountOrDecided::Undecided(count) => count,
-            CountOrDecided::Draw => Count {
+            UcbSolver::Undecided(count) => count,
+            UcbSolver::Draw => Count {
                 draws: 1,
                 ..Count::default()
             },
-            CountOrDecided::Win(player) => {
+            UcbSolver::Win(player) => {
                 let mut count = Count::default();
                 count.report_win_for(player);
                 count
@@ -50,12 +50,12 @@ impl CountOrDecided {
     }
 }
 
-impl Evaluation for CountOrDecided {
+impl Evaluation for UcbSolver {
     type Delta = CountOrDecidedDelta;
 
-    fn cmp_for(&self, other: &CountOrDecided, player: Player) -> Ordering {
+    fn cmp_for(&self, other: &UcbSolver, player: Player) -> Ordering {
         match (self, other) {
-            (CountOrDecided::Win(p1), CountOrDecided::Win(p2)) => {
+            (UcbSolver::Win(p1), UcbSolver::Win(p2)) => {
                 if *p1 == *p2 {
                     Ordering::Equal
                 } else if *p1 == player {
@@ -64,37 +64,37 @@ impl Evaluation for CountOrDecided {
                     Ordering::Less
                 }
             }
-            (CountOrDecided::Win(p1), _) => {
+            (UcbSolver::Win(p1), _) => {
                 if *p1 == player {
                     Ordering::Greater
                 } else {
                     Ordering::Less
                 }
             }
-            (CountOrDecided::Draw, CountOrDecided::Win(p2)) => {
+            (UcbSolver::Draw, UcbSolver::Win(p2)) => {
                 if *p2 == player {
                     Ordering::Less
                 } else {
                     Ordering::Greater
                 }
             }
-            (CountOrDecided::Draw, CountOrDecided::Draw) => Ordering::Equal,
-            (CountOrDecided::Draw, CountOrDecided::Undecided(count)) => {
+            (UcbSolver::Draw, UcbSolver::Draw) => Ordering::Equal,
+            (UcbSolver::Draw, UcbSolver::Undecided(count)) => {
                 0.5.partial_cmp(&count.reward(player)).unwrap()
             }
-            (CountOrDecided::Undecided(c1), CountOrDecided::Undecided(c2)) => {
+            (UcbSolver::Undecided(c1), UcbSolver::Undecided(c2)) => {
                 c1.reward(player).partial_cmp(&c2.reward(player)).unwrap()
             }
             (a, b) => b.cmp_for(a, player).reverse(),
         }
     }
 
-    fn selection_weight(&self, parent_eval: &CountOrDecided, selecting_player: Player) -> f32 {
+    fn selection_weight(&self, parent_eval: &UcbSolver, selecting_player: Player) -> f32 {
         let total_visits_parent = parent_eval.total() as f32;
         match self {
-            CountOrDecided::Undecided(count) => count.ucb(total_visits_parent, selecting_player),
-            CountOrDecided::Draw => 0.5,
-            CountOrDecided::Win(winning_player) => {
+            UcbSolver::Undecided(count) => count.ucb(total_visits_parent, selecting_player),
+            UcbSolver::Draw => 0.5,
+            UcbSolver::Win(winning_player) => {
                 if selecting_player == *winning_player {
                     f32::MAX
                 } else {
@@ -111,7 +111,7 @@ impl Evaluation for CountOrDecided {
     /// in turn is passed to the update of its parent node.
     fn update(
         &mut self,
-        sibling_evaluations: impl Iterator<Item = Option<CountOrDecided>>,
+        sibling_evaluations: impl Iterator<Item = Option<UcbSolver>>,
         propagated_delta: CountOrDecidedDelta,
         choosing_player: Player,
     ) -> CountOrDecidedDelta {
@@ -120,7 +120,7 @@ impl Evaluation for CountOrDecided {
             propagated_evaluation,
             previous_count: previous_child_count,
         } = propagated_delta;
-        if propagated_evaluation == CountOrDecided::Win(choosing_player) {
+        if propagated_evaluation == UcbSolver::Win(choosing_player) {
             // If it is the choosing players turn, she will choose a win
             *self = propagated_evaluation;
             return CountOrDecidedDelta {
@@ -129,7 +129,7 @@ impl Evaluation for CountOrDecided {
             };
         }
         // If the choosing player is not guaranteed to win let's check if there is a draw or a loss
-        let loss = CountOrDecided::Win(choosing_player.opponent());
+        let loss = UcbSolver::Win(choosing_player.opponent());
         if propagated_evaluation.is_solved() {
             let mut acc = Some(propagated_evaluation);
             for maybe_eval in sibling_evaluations {
@@ -139,9 +139,9 @@ impl Evaluation for CountOrDecided {
                     acc = None;
                     break;
                 };
-                if child_eval == CountOrDecided::Draw {
+                if child_eval == UcbSolver::Draw {
                     // Found a draw, so we can be sure its not a loss
-                    acc = Some(CountOrDecided::Draw);
+                    acc = Some(UcbSolver::Draw);
                 } else if child_eval != loss {
                     // Found a child neither draw or loss, so we can not rule out a victory yet
                     acc = None;
@@ -158,7 +158,7 @@ impl Evaluation for CountOrDecided {
         }
         // No deterministic outcome, let's propagete the counts
         let propageted_count = match propagated_evaluation {
-            CountOrDecided::Win(Player::One) => {
+            UcbSolver::Win(Player::One) => {
                 let mut count = Count {
                     wins_player_one: previous_child_count.total() + propagated_evaluation.total(),
                     ..Default::default()
@@ -166,7 +166,7 @@ impl Evaluation for CountOrDecided {
                 count -= previous_child_count;
                 count
             }
-            CountOrDecided::Win(Player::Two) => {
+            UcbSolver::Win(Player::Two) => {
                 let mut count = Count {
                     wins_player_two: previous_child_count.total() + propagated_evaluation.total(),
                     ..Default::default()
@@ -174,7 +174,7 @@ impl Evaluation for CountOrDecided {
                 count -= previous_child_count;
                 count
             }
-            CountOrDecided::Draw => {
+            UcbSolver::Draw => {
                 let mut count = Count {
                     draws: previous_child_count.total() + propagated_evaluation.total(),
                     ..Default::default()
@@ -182,16 +182,16 @@ impl Evaluation for CountOrDecided {
                 count -= previous_child_count;
                 count
             }
-            CountOrDecided::Undecided(count) => count,
+            UcbSolver::Undecided(count) => count,
         };
 
         let (new_eval, delta) = match self {
-            CountOrDecided::Undecided(mut count) => {
+            UcbSolver::Undecided(mut count) => {
                 count += propageted_count;
                 (
-                    CountOrDecided::Undecided(count),
+                    UcbSolver::Undecided(count),
                     CountOrDecidedDelta {
-                        propagated_evaluation: CountOrDecided::Undecided(propageted_count),
+                        propagated_evaluation: UcbSolver::Undecided(propageted_count),
                         previous_count,
                     },
                 )
@@ -199,7 +199,7 @@ impl Evaluation for CountOrDecided {
             _ => (
                 *self,
                 CountOrDecidedDelta {
-                    propagated_evaluation: CountOrDecided::Undecided(propageted_count),
+                    propagated_evaluation: UcbSolver::Undecided(propageted_count),
                     previous_count,
                 },
             ),
@@ -210,8 +210,8 @@ impl Evaluation for CountOrDecided {
     
     fn is_solved(&self) -> bool {
         match self {
-            CountOrDecided::Win(_) | CountOrDecided::Draw => true,
-            CountOrDecided::Undecided(_) => false,
+            UcbSolver::Win(_) | UcbSolver::Draw => true,
+            UcbSolver::Undecided(_) => false,
         }
     }
 
@@ -224,15 +224,15 @@ impl Evaluation for CountOrDecided {
     
     fn init_from_game_state<M>(state: &GameState<'_, M>) -> Self {
         match state {
-            GameState::Moves(_) => CountOrDecided::Undecided(Count::default()),
-            GameState::Draw => CountOrDecided::Draw,
-            GameState::WinPlayerOne => CountOrDecided::Win(Player::One),
-            GameState::WinPlayerTwo => CountOrDecided::Win(Player::Two),
+            GameState::Moves(_) => UcbSolver::Undecided(Count::default()),
+            GameState::Draw => UcbSolver::Draw,
+            GameState::WinPlayerOne => UcbSolver::Win(Player::One),
+            GameState::WinPlayerTwo => UcbSolver::Win(Player::Two),
         }
     }
 }
 
-impl Default for CountOrDecided {
+impl Default for UcbSolver {
     fn default() -> Self {
         Self::Undecided(Count::default())
     }
@@ -242,7 +242,7 @@ impl Default for CountOrDecided {
 pub struct CountOrDecidedDelta {
     /// Did the child change to a win for either player? Is it a draw? In case of undecided the
     /// count is **not** the count of the child, but the count of the change in the child.
-    pub propagated_evaluation: CountOrDecided,
+    pub propagated_evaluation: UcbSolver,
     /// The count of the child before the change. We can assume the child has been in the
     /// [`CountOrDecided::Undecided`] state before the change. Otherwise it would not have been
     /// selected for expansion.
@@ -253,13 +253,13 @@ pub struct CountOrDecidedDelta {
 mod test {
     use std::cmp::Ordering;
 
-    use crate::{Count, CountOrDecided, Evaluation as _, Player};
+    use crate::{Count, UcbSolver, Evaluation as _, Player};
 
     #[test]
     fn compare_evaluations() {
-        let win_player_one = CountOrDecided::Win(Player::One);
-        let win_player_two = CountOrDecided::Win(Player::Two);
-        let draw = CountOrDecided::Draw;
+        let win_player_one = UcbSolver::Win(Player::One);
+        let win_player_two = UcbSolver::Win(Player::Two);
+        let draw = UcbSolver::Draw;
         let one = Player::One;
         let two = Player::Two;
 
@@ -279,7 +279,7 @@ mod test {
         assert_eq!(draw.cmp_for(&draw, one), Ordering::Equal);
         assert_eq!(
             draw.cmp_for(
-                &CountOrDecided::Undecided(Count {
+                &UcbSolver::Undecided(Count {
                     draws: 1,
                     ..Count::default()
                 }),
@@ -289,7 +289,7 @@ mod test {
         );
         assert_eq!(
             draw.cmp_for(
-                &CountOrDecided::Undecided(Count {
+                &UcbSolver::Undecided(Count {
                     wins_player_one: 1,
                     ..Count::default()
                 }),
@@ -298,7 +298,7 @@ mod test {
             Ordering::Less
         );
         assert_eq!(
-            CountOrDecided::Undecided(Count {
+            UcbSolver::Undecided(Count {
                 wins_player_one: 1,
                 ..Count::default()
             })
@@ -306,7 +306,7 @@ mod test {
             Ordering::Less
         );
         assert_eq!(
-            CountOrDecided::Undecided(Count {
+            UcbSolver::Undecided(Count {
                 wins_player_two: 1,
                 ..Count::default()
             })
@@ -314,12 +314,12 @@ mod test {
             Ordering::Greater
         );
         assert_eq!(
-            CountOrDecided::Undecided(Count {
+            UcbSolver::Undecided(Count {
                 wins_player_one: 1,
                 ..Count::default()
             })
             .cmp_for(
-                &CountOrDecided::Undecided(Count {
+                &UcbSolver::Undecided(Count {
                     wins_player_two: 1,
                     ..Count::default()
                 }),

@@ -4,7 +4,7 @@ use std::{
 
 use connect_four_solver::{Column, Solver};
 use monte_carlo_tree_search::{
-    Bias, Count, CountOrDecided, GameState, Player, RandomPlayoutBias, Tree, TwoPlayerGame,
+    Bias, Count, UcbSolver, GameState, Player, RandomPlayoutBias, Tree, TwoPlayerGame,
 };
 use rand::{rngs::StdRng, seq::IndexedRandom as _, Rng, SeedableRng};
 
@@ -27,7 +27,7 @@ fn start_from_terminal_position() {
     let game = ConnectFour::from_move_list("1212121");
     let tree = Tree::new(game, RandomPlayoutBias);
 
-    assert_eq!(CountOrDecided::Win(Player::One), tree.evaluation());
+    assert_eq!(UcbSolver::Win(Player::One), tree.evaluation());
 }
 
 /// Position occured once letting the tree play against itself, for some reason the solver did not
@@ -74,7 +74,7 @@ fn position_42442445555772222514171() {
     print_move_statistics(&tree);
     assert!(tree
         .eval_by_move()
-        .all(|(_move, eval)| eval == CountOrDecided::Win(Player::One)));
+        .all(|(_move, eval)| eval == UcbSolver::Win(Player::One)));
     assert_eq!(Column::from_index(0), tree.best_move().unwrap());
 }
 
@@ -150,12 +150,12 @@ fn solve_connect_four() {
 
     let tree = Tree::with_playouts(game, PerfectBias::new(), num_playouts, &mut rng);
     print_move_statistics(&tree);
-    assert_eq!(CountOrDecided::Win(Player::One), tree.evaluation());
+    assert_eq!(UcbSolver::Win(Player::One), tree.evaluation());
 }
 
 fn print_move_statistics<B>(tree: &Tree<ConnectFour, B>)
 where
-    B: Bias<ConnectFour, Evaluation = CountOrDecided>,
+    B: Bias<ConnectFour, Evaluation = UcbSolver>,
 {
     let evals = tree.eval_by_move().collect::<Vec<_>>();
     for (mv, eval) in evals {
@@ -223,24 +223,24 @@ impl TwoPlayerGame for ConnectFour {
 struct ConnectFourBias;
 
 impl Bias<ConnectFour> for ConnectFourBias {
-    type Evaluation = CountOrDecided;
+    type Evaluation = UcbSolver;
 
     fn bias(
         &mut self,
         mut game: ConnectFour,
         move_buf: &mut Vec<Column>,
         rng: &mut impl Rng,
-    ) -> CountOrDecided {
+    ) -> UcbSolver {
         // Check for terminal position. Actually this should never be used, as bias should only be
         // invoked on non-terminal positions.
         debug_assert!(!game.0.is_victory());
         // If the current player can win in the next move, we can deterministically say that this
         // board evaluates to a win for this player.
         if game.0.can_win_in_next_move() {
-            return CountOrDecided::Win(game.current_player());
+            return UcbSolver::Win(game.current_player());
         }
         if game.0.non_loosing_moves().next().is_none() {
-            return CountOrDecided::Win(game.current_player().opponent());
+            return UcbSolver::Win(game.current_player().opponent());
         }
         loop {
             match game.state(move_buf) {
@@ -249,7 +249,7 @@ impl Bias<ConnectFour> for ConnectFourBias {
                     unreachable!("Should have detected winning move beforehand")
                 }
                 GameState::Draw => {
-                    return CountOrDecided::Undecided(Count {
+                    return UcbSolver::Undecided(Count {
                         draws: 1,
                         ..Count::default()
                     })
@@ -258,7 +258,7 @@ impl Bias<ConnectFour> for ConnectFourBias {
             if game.0.can_win_in_next_move() {
                 let mut count = Count::default();
                 count.report_win_for(game.current_player());
-                return CountOrDecided::Undecided(count);
+                return UcbSolver::Undecided(count);
             }
             move_buf.clear();
             move_buf.extend(game.0.non_loosing_moves());
@@ -268,13 +268,13 @@ impl Bias<ConnectFour> for ConnectFourBias {
                 // No move available which would not allow our opponent to win, so we loose.
                 let mut count = Count::default();
                 count.report_win_for(game.current_player().opponent());
-                return CountOrDecided::Undecided(count);
+                return UcbSolver::Undecided(count);
             }
         }
     }
 
     fn unexplored(&self) -> Self::Evaluation {
-        CountOrDecided::Undecided(Count::default())
+        UcbSolver::Undecided(Count::default())
     }
 }
 
@@ -295,28 +295,28 @@ impl PerfectBias {
 }
 
 impl Bias<ConnectFour> for PerfectBias {
-    type Evaluation = CountOrDecided;
+    type Evaluation = UcbSolver;
     
-    fn bias(&mut self, game: ConnectFour, _move_buf: &mut Vec<Column>, _: &mut impl Rng) -> CountOrDecided {
+    fn bias(&mut self, game: ConnectFour, _move_buf: &mut Vec<Column>, _: &mut impl Rng) -> UcbSolver {
         let score = self.solver.score(&game.0);
         let current = game.current_player();
         match score.cmp(&0) {
-            Ordering::Equal => CountOrDecided::Undecided(Count { draws: 1, ..Default::default() }),
+            Ordering::Equal => UcbSolver::Undecided(Count { draws: 1, ..Default::default() }),
             Ordering::Greater => {
                 let mut count = Count::default();
                 count.report_win_for(current);
-                CountOrDecided::Undecided(count)
+                UcbSolver::Undecided(count)
             }
             Ordering::Less => {
                 let mut count = Count::default();
                 count.report_win_for(current.opponent());
-                CountOrDecided::Undecided(count)
+                UcbSolver::Undecided(count)
             }
         }
     }
     
     fn unexplored(&self) -> Self::Evaluation {
-        CountOrDecided::Undecided(Count::default())
+        UcbSolver::Undecided(Count::default())
     }    
 }
 
@@ -327,7 +327,7 @@ fn use_tree_to_generate_move<B>(
     rng: &mut impl Rng,
 ) -> Column
 where
-    B: Bias<ConnectFour, Evaluation = CountOrDecided>,
+    B: Bias<ConnectFour, Evaluation = UcbSolver>,
 {
     let tree = Tree::with_playouts(ConnectFour(game), bias, num_playouts, rng);
     eprintln!("nodes: {} links: {}", tree.num_nodes(), tree.num_links());

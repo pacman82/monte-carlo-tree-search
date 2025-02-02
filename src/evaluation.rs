@@ -1,11 +1,11 @@
 mod count;
-mod count_or_decided;
+mod ucb_solver;
 
 use std::cmp::Ordering;
 
 use crate::{GameState, Player};
 
-pub use self::{count::Count, count_or_decided::{CountOrDecided, CountOrDecidedDelta}};
+pub use self::{count::Count, ucb_solver::{UcbSolver, CountOrDecidedDelta}};
 
 /// Controls what information is stored for each board remembered in the nodes of the tree, how
 /// to change it during backpropagation and what criteria to use to select the next node to expand.
