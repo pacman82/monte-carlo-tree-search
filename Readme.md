@@ -23,3 +23,9 @@ Yet in order to isolate the decisions I want to play around with (using baysean 
 * The action space and assumptions about the difference agents. Here we are currently more specialized than might be necessary. This is currently handled by the `TwoPlayerGame` trait, and as the name might indicated is to be intended to be implemented for two player board games. Currenly assuming alternating order between players, perfect information, no random elements. Right now there are implementations for TicTacToe and ConnectFour in the tests. Works pretty well.
 * For `Evaluation` currently we are only using an Upper confidence bound based strategy, which is used during backpropagation and selection.
 * `Bias` is already exchangable. There is a generic implementation `RandomPlayoutBias` which works for any game. A slightly more sophisticated heuristic is necessary to make the moves viable for connect-four.
+
+### Monte Carlo Tree Search
+
+* Solving TicTacToe is no problem
+* With a slightly less random playout (avoiding immediate losses, and prefering winning moves) a 20_000 playout tree search (using UCB) managed to beat a perfect solver in Connect Four. Turns out though, its a bit of a fluke, if I mess with the seed for the randomizer, the tree search still makes mistakes. Yet, it plays a strong game of Connect four non the less
+* Even with perfect intuition (non-random playouts, using a perfect solver to generate the count), its hard to solve connect four. Probably because we pick the child node to extend at random, and extend every child. Also using combinatorics and distributions instead of counts could help here.
