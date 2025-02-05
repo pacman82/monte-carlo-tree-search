@@ -1,10 +1,12 @@
 use std::{
-    cmp::Ordering, fmt::{self, Display}, io::Write
+    cmp::Ordering,
+    fmt::{self, Display},
+    io::Write,
 };
 
 use connect_four_solver::{Column, Solver};
 use monte_carlo_tree_search::{
-    Bias, Ucb, UcbSolver, GameState, Player, RandomPlayoutUcbSolver, Tree, TwoPlayerGame,
+    Bias, GameState, Player, RandomPlayoutUcbSolver, Tree, TwoPlayerGame, Ucb, UcbSolver,
 };
 use rand::{rngs::StdRng, seq::IndexedRandom as _, Rng, SeedableRng};
 
@@ -14,7 +16,7 @@ fn play_move_connect_four() {
     let game = ConnectFour::new();
     let num_playouts = 100;
 
-    let tree = Tree::with_playouts(game, RandomPlayoutUcbSolver, num_playouts, &mut rng);
+    let tree = Tree::with_playouts(game, RandomPlayoutUcbSolver::new(), num_playouts, &mut rng);
 
     for (move_, eval) in tree.eval_by_move() {
         eprintln!("Eval child {:?}: {:?} ", move_, eval,);
@@ -25,7 +27,7 @@ fn play_move_connect_four() {
 fn start_from_terminal_position() {
     // First player has won
     let game = ConnectFour::from_move_list("1212121");
-    let tree = Tree::new(game, RandomPlayoutUcbSolver);
+    let tree = Tree::new(game, RandomPlayoutUcbSolver::new());
 
     assert_eq!(UcbSolver::Win(Player::One), tree.evaluation());
 }
@@ -47,7 +49,7 @@ fn position_424424455557722225141717() {
 
     let mut rng = StdRng::seed_from_u64(42);
     let num_playouts = 1_000;
-    let tree = Tree::with_playouts(game, RandomPlayoutUcbSolver, num_playouts, &mut rng);
+    let tree = Tree::with_playouts(game, RandomPlayoutUcbSolver::new(), num_playouts, &mut rng);
     print_move_statistics(&tree);
     assert_eq!(Column::from_index(0), tree.best_move().unwrap());
 }
@@ -70,7 +72,7 @@ fn position_42442445555772222514171() {
 
     let mut rng = StdRng::seed_from_u64(42);
     let num_playouts = 1000;
-    let tree = Tree::with_playouts(game, RandomPlayoutUcbSolver, num_playouts, &mut rng);
+    let tree = Tree::with_playouts(game, RandomPlayoutUcbSolver::new(), num_playouts, &mut rng);
     print_move_statistics(&tree);
     assert!(tree
         .eval_by_move()
@@ -91,7 +93,8 @@ fn beat_perfect_solver_as_player_one() {
         let next_move = match game.current_player() {
             Player::One => {
                 let num_playouts = 20_000;
-                let tree = Tree::with_playouts(game, ConnectFourBias, num_playouts, &mut rng);
+                let tree =
+                    Tree::with_playouts(game, ConnectFourBias::new(), num_playouts, &mut rng);
                 eprintln!("nodes: {} links: {}", tree.num_nodes(), tree.num_links());
                 print_move_statistics(&tree);
                 tree.best_move().unwrap()
@@ -122,13 +125,13 @@ fn play_against_yourself() {
         let next_move = if game.stones() % 2 == 0 {
             // Player One
             eprintln!("Player One");
-            let bias = ConnectFourBias;
+            let bias = ConnectFourBias::new();
             let num_playouts = 100_000;
             use_tree_to_generate_move(game, num_playouts, bias, &mut rng)
         } else {
             // Player Two
             eprintln!("Player Two");
-            let bias = RandomPlayoutUcbSolver;
+            let bias = RandomPlayoutUcbSolver::new();
             let num_playouts = 100_000;
             use_tree_to_generate_move(game, num_playouts, bias, &mut rng)
         };
@@ -220,17 +223,22 @@ impl TwoPlayerGame for ConnectFour {
 /// Uses a random playout to generate a bias. However the random players will take a winning move if
 /// any is possible. A player will also prefer move wich prevent his opponent from winning
 /// immediately on his/her next move, if possible.
-struct ConnectFourBias;
+struct ConnectFourBias {
+    move_buf: Vec<Column>,
+}
+
+impl ConnectFourBias {
+    pub fn new() -> Self {
+        ConnectFourBias {
+            move_buf: Vec::new(),
+        }
+    }
+}
 
 impl Bias<ConnectFour> for ConnectFourBias {
     type Evaluation = UcbSolver;
 
-    fn bias(
-        &mut self,
-        mut game: ConnectFour,
-        move_buf: &mut Vec<Column>,
-        rng: &mut impl Rng,
-    ) -> UcbSolver {
+    fn bias(&mut self, mut game: ConnectFour, rng: &mut impl Rng) -> UcbSolver {
         // Check for terminal position. Actually this should never be used, as bias should only be
         // invoked on non-terminal positions.
         debug_assert!(!game.0.is_victory());
@@ -243,7 +251,7 @@ impl Bias<ConnectFour> for ConnectFourBias {
             return UcbSolver::Win(game.current_player().opponent());
         }
         loop {
-            match game.state(move_buf) {
+            match game.state(&mut self.move_buf) {
                 GameState::Moves(_moves) => (),
                 GameState::WinPlayerOne | GameState::WinPlayerTwo => {
                     unreachable!("Should have detected winning move beforehand")
@@ -260,9 +268,9 @@ impl Bias<ConnectFour> for ConnectFourBias {
                 count.report_win_for(game.current_player());
                 return UcbSolver::Undecided(count);
             }
-            move_buf.clear();
-            move_buf.extend(game.0.non_loosing_moves());
-            if let Some(next_move) = move_buf.choose(rng) {
+            self.move_buf.clear();
+            self.move_buf.extend(game.0.non_loosing_moves());
+            if let Some(next_move) = self.move_buf.choose(rng) {
                 game.play(next_move);
             } else {
                 // No move available which would not allow our opponent to win, so we loose.
@@ -275,6 +283,10 @@ impl Bias<ConnectFour> for ConnectFourBias {
 
     fn unexplored(&self) -> Self::Evaluation {
         UcbSolver::Undecided(Ucb::default())
+    }
+
+    fn reevaluate(&mut self, _game: ConnectFour, _previous_evaluation: UcbSolver) -> UcbSolver {
+        unreachable!("Solver will not consider the same leaf twice")
     }
 }
 
@@ -296,12 +308,15 @@ impl PerfectBias {
 
 impl Bias<ConnectFour> for PerfectBias {
     type Evaluation = UcbSolver;
-    
-    fn bias(&mut self, game: ConnectFour, _move_buf: &mut Vec<Column>, _: &mut impl Rng) -> UcbSolver {
+
+    fn bias(&mut self, game: ConnectFour, _: &mut impl Rng) -> UcbSolver {
         let score = self.solver.score(&game.0);
         let current = game.current_player();
         match score.cmp(&0) {
-            Ordering::Equal => UcbSolver::Undecided(Ucb { draws: 1, ..Default::default() }),
+            Ordering::Equal => UcbSolver::Undecided(Ucb {
+                draws: 1,
+                ..Default::default()
+            }),
             Ordering::Greater => {
                 let mut count = Ucb::default();
                 count.report_win_for(current);
@@ -314,10 +329,14 @@ impl Bias<ConnectFour> for PerfectBias {
             }
         }
     }
-    
+
     fn unexplored(&self) -> Self::Evaluation {
         UcbSolver::Undecided(Ucb::default())
-    }    
+    }
+
+    fn reevaluate(&mut self, _game: ConnectFour, _previous_evaluation: UcbSolver) -> UcbSolver {
+        unreachable!("Solver will not consider the same leaf twice")
+    }
 }
 
 fn use_tree_to_generate_move<B>(

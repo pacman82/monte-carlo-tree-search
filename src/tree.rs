@@ -80,9 +80,20 @@ where
     /// Playout one cycle of selection, expansion, simulation and backpropagation. `true` if the
     /// playout may have changed the evaluation of the root, `false` if the game is already solved.
     pub fn playout(&mut self, rng: &mut impl Rng) -> bool {
-        let Some((to_be_expanded_index, mut game)) = self.select_unexplored_node() else {
+        if self.nodes[0].evaluation.is_solved() {
             return false;
-        };
+        }
+
+        let Selection {
+            node_index: to_be_expanded_index,
+            board: mut game,
+            has_unexplored_children,
+        } = self.select_unexplored_node();
+
+        if !has_unexplored_children {
+            return false;
+        }
+
         // Create a new child node for the selected node and let `game` represent its state
         let new_node_index = self.expand(to_be_expanded_index, &mut game, rng);
 
@@ -91,7 +102,7 @@ where
 
         // If the game is not in a terminal state, start a simulation to gain an initial estimate
         if !self.nodes[new_node_index].evaluation.is_solved() {
-            let bias = self.bias.bias(game, &mut self.move_buf, rng);
+            let bias = self.bias.bias(game, rng);
             self.nodes[new_node_index].evaluation = bias;
         }
 
@@ -146,7 +157,7 @@ where
     /// # Return
     ///
     /// Index of the selected leaf node and the game state of the node.
-    fn select_unexplored_node(&self) -> Option<(usize, G)> {
+    fn select_unexplored_node(&self) -> Selection<G> {
         let mut current_node_index = 0;
         let mut game = self.game.clone();
         while !self.has_unexplored_children(current_node_index) {
@@ -168,16 +179,20 @@ where
                     a.partial_cmp(&b).unwrap()
                 })
             else {
-                // We should never decent into a solved node. Any unsolved node should have at least
-                // one unsolved child, otherwise, would it not have been solved during
-                // backpropagation?
-                debug_assert_eq!(current_node_index, 0);
-                return None;
+                return Selection {
+                    node_index: current_node_index,
+                    board: game,
+                    has_unexplored_children: false,
+                };
             };
             game.play(&best_ucb.move_);
             current_node_index = best_ucb.child;
         }
-        Some((current_node_index, game))
+        Selection {
+            node_index: current_node_index,
+            board: game,
+            has_unexplored_children: true,
+        }
     }
 
     /// Expand an unexplored child of the selected node. Mutates `game` to represent state of the
@@ -360,4 +375,18 @@ impl<M> Link<M> {
     fn is_explored(&self) -> bool {
         self.child != usize::MAX
     }
+}
+
+/// Result of [`Tree::select_unexplored_node`]. Provides the input for expansion and
+/// backpropagation. We need to distinguish between a node we want to expand or a node we without
+/// selectable children, which is reevaluated.
+struct Selection<G> {
+    /// Index of the selected node
+    node_index: usize,
+    /// A board representing the game state associated with the selected node.
+    board: G,
+    /// `true` if the node has at least one child, which in unexplored and suitable for expansion.
+    /// `false` if the node is either terminal, solved or both. It does not have any children which
+    /// would be considered during a selection phase.
+    has_unexplored_children: bool,
 }

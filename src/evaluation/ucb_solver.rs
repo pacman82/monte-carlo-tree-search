@@ -2,7 +2,7 @@ use std::cmp::Ordering;
 
 use crate::{GameState, Player};
 
-use super::{Ucb, Evaluation};
+use super::{Evaluation, Ucb};
 
 /// Use an Upper Confidence Bound to select the next node to expand. In addition to the use of the
 /// "classic" upper confidence bound, this evaluation also features variants for states such as
@@ -207,7 +207,7 @@ impl Evaluation for UcbSolver {
         *self = new_eval;
         delta
     }
-    
+
     fn is_solved(&self) -> bool {
         match self {
             UcbSolver::Win(_) | UcbSolver::Draw => true,
@@ -221,7 +221,7 @@ impl Evaluation for UcbSolver {
             previous_count: Ucb::default(),
         }
     }
-    
+
     fn init_from_game_state<M>(state: &GameState<'_, M>) -> Self {
         match state {
             GameState::Moves(_) => UcbSolver::Undecided(Ucb::default()),
@@ -253,7 +253,7 @@ pub struct CountOrDecidedDelta {
 mod test {
     use std::cmp::Ordering;
 
-    use crate::{Ucb, UcbSolver, Evaluation as _, Player};
+    use crate::{Evaluation as _, Player, Ucb, UcbSolver};
 
     #[test]
     fn compare_evaluations() {
