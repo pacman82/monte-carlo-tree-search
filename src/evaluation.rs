@@ -5,7 +5,10 @@ use std::cmp::Ordering;
 
 use crate::{GameState, Player};
 
-pub use self::{ucb::Ucb, ucb_solver::{UcbSolver, CountOrDecidedDelta}};
+pub use self::{
+    ucb::Ucb,
+    ucb_solver::{CountOrDecidedDelta, UcbSolver},
+};
 
 /// Controls what information is stored for each board remembered in the nodes of the tree, how
 /// to change it during backpropagation and what criteria to use to select the next node to expand.

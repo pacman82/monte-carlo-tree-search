@@ -1,4 +1,7 @@
-use std::{cmp::Ordering, ops::{AddAssign, SubAssign}};
+use std::{
+    cmp::Ordering,
+    ops::{AddAssign, SubAssign},
+};
 
 use crate::{GameState, Player};
 
@@ -71,7 +74,9 @@ impl Evaluation for Ucb {
     type Delta = Ucb;
 
     fn cmp_for(&self, other: &Self, player: Player) -> Ordering {
-        self.reward(player).partial_cmp(&other.reward(player)).unwrap()
+        self.reward(player)
+            .partial_cmp(&other.reward(player))
+            .unwrap()
     }
 
     fn selection_weight(&self, parent_eval: &Self, selecting_player: Player) -> f32 {
