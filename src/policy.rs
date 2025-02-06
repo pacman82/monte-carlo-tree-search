@@ -2,15 +2,17 @@ use rand::{seq::IndexedRandom as _, Rng};
 
 use crate::{Evaluation, GameState, TwoPlayerGame, CountWdl, CountWdlSolved};
 
-/// Used to obtain an ininitial bias for the outcome of a game starting from a given board.
-pub trait Bias<G: TwoPlayerGame> {
+/// Control selection, evaluation and backpropagation.
+pub trait Policy<G: TwoPlayerGame> {
     /// The type of evaluation returned by the bias.
     type Evaluation: Evaluation;
 
-    fn bias(&mut self, game: G, rng: &mut impl Rng) -> Self::Evaluation;
+    /// Initial evaluation of a newly expanded node
+    fn initial_evaluation(&mut self, game: G, rng: &mut impl Rng) -> Self::Evaluation;
 
     /// Evaluation given to unexplored nodes for the purpose of choosing the best node from root.
-    fn unexplored(&self) -> Self::Evaluation;
+    /// This evaluation is not used during selection phase
+    fn unexplored_bias(&self) -> Self::Evaluation;
 
     /// Invoked then selection yields a node that has been visited before.
     fn reevaluate(&mut self, game: G, previous_evaluation: Self::Evaluation) -> Self::Evaluation;
@@ -40,17 +42,17 @@ where
     }
 }
 
-impl<G> Bias<G> for RandomPlayoutUcb<G>
+impl<G> Policy<G> for RandomPlayoutUcb<G>
 where
     G: TwoPlayerGame,
 {
     type Evaluation = CountWdl;
 
-    fn bias(&mut self, game: G, rng: &mut impl Rng) -> CountWdl {
+    fn initial_evaluation(&mut self, game: G, rng: &mut impl Rng) -> CountWdl {
         random_play(game, &mut self.move_buf, rng)
     }
 
-    fn unexplored(&self) -> CountWdl {
+    fn unexplored_bias(&self) -> CountWdl {
         CountWdl::default()
     }
 
@@ -83,17 +85,17 @@ impl<G: TwoPlayerGame> Default for RandomPlayoutUcbSolver<G> {
     }
 }
 
-impl<G> Bias<G> for RandomPlayoutUcbSolver<G>
+impl<G> Policy<G> for RandomPlayoutUcbSolver<G>
 where
     G: TwoPlayerGame,
 {
     type Evaluation = CountWdlSolved;
 
-    fn bias(&mut self, game: G, rng: &mut impl Rng) -> CountWdlSolved {
+    fn initial_evaluation(&mut self, game: G, rng: &mut impl Rng) -> CountWdlSolved {
         CountWdlSolved::Undecided(random_play(game, &mut self.move_buf, rng))
     }
 
-    fn unexplored(&self) -> CountWdlSolved {
+    fn unexplored_bias(&self) -> CountWdlSolved {
         CountWdlSolved::Undecided(CountWdl::default())
     }
 

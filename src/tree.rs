@@ -2,12 +2,12 @@ use std::cmp::Ordering;
 
 use rand::{seq::IndexedRandom as _, Rng};
 
-use crate::{Bias, Evaluation, Player, TwoPlayerGame};
+use crate::{Policy, Evaluation, Player, TwoPlayerGame};
 
 /// A tree there the nodes represent game states and the links represent moves. The tree does only
 /// store the root game state and reconstruct the nodes based on the moves. It does store an
 /// evaluation for each node though. The evaluation is updated during each playout.
-pub struct Tree<G: TwoPlayerGame, B: Bias<G>> {
+pub struct Tree<G: TwoPlayerGame, B: Policy<G>> {
     /// Game state of the root node.
     game: G,
     /// We store all the nodes of the tree in a vector to avoid allocations. We refer to the nodes
@@ -39,7 +39,7 @@ pub struct Tree<G: TwoPlayerGame, B: Bias<G>> {
 impl<G, B> Tree<G, B>
 where
     G: TwoPlayerGame,
-    B: Bias<G>,
+    B: Policy<G>,
 {
     pub fn new(game: G, bias: B) -> Self {
         let mut move_buf = Vec::new();
@@ -102,7 +102,7 @@ where
 
         // If the game is not in a terminal state, start a simulation to gain an initial estimate
         if !self.nodes[new_node_index].evaluation.is_solved() {
-            let bias = self.bias.bias(game, rng);
+            let bias = self.bias.initial_evaluation(game, rng);
             self.nodes[new_node_index].evaluation = bias;
         }
 
@@ -143,7 +143,7 @@ where
                     let child = &self.nodes[link.child];
                     (link.move_, child.evaluation)
                 } else {
-                    (link.move_, self.bias.unexplored())
+                    (link.move_, self.bias.unexplored_bias())
                 }
             })
     }
@@ -297,7 +297,7 @@ where
         if link.is_explored() {
             self.nodes[link.child].evaluation
         } else {
-            self.bias.unexplored()
+            self.bias.unexplored_bias()
         }
     }
 

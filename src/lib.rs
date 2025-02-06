@@ -1,11 +1,11 @@
-mod bias;
+mod policy;
 mod evaluation;
 mod player;
 mod tree;
 mod two_player_game;
 
 pub use self::{
-    bias::{random_play, Bias, RandomPlayoutUcb, RandomPlayoutUcbSolver},
+    policy::{random_play, Policy, RandomPlayoutUcb, RandomPlayoutUcbSolver},
     evaluation::{CountOrDecidedDelta, Evaluation, CountWdl, CountWdlSolved},
     player::Player,
     tree::Tree,

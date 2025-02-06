@@ -6,7 +6,7 @@ use std::{
 
 use connect_four_solver::{Column, Solver};
 use monte_carlo_tree_search::{
-    Bias, GameState, Player, RandomPlayoutUcbSolver, Tree, TwoPlayerGame, CountWdl, CountWdlSolved,
+    Policy, GameState, Player, RandomPlayoutUcbSolver, Tree, TwoPlayerGame, CountWdl, CountWdlSolved,
 };
 use rand::{rngs::StdRng, seq::IndexedRandom as _, Rng, SeedableRng};
 
@@ -158,7 +158,7 @@ fn solve_connect_four() {
 
 fn print_move_statistics<B>(tree: &Tree<ConnectFour, B>)
 where
-    B: Bias<ConnectFour, Evaluation = CountWdlSolved>,
+    B: Policy<ConnectFour, Evaluation = CountWdlSolved>,
 {
     let evals = tree.eval_by_move().collect::<Vec<_>>();
     for (mv, eval) in evals {
@@ -235,10 +235,10 @@ impl ConnectFourBias {
     }
 }
 
-impl Bias<ConnectFour> for ConnectFourBias {
+impl Policy<ConnectFour> for ConnectFourBias {
     type Evaluation = CountWdlSolved;
 
-    fn bias(&mut self, mut game: ConnectFour, rng: &mut impl Rng) -> CountWdlSolved {
+    fn initial_evaluation(&mut self, mut game: ConnectFour, rng: &mut impl Rng) -> CountWdlSolved {
         // Check for terminal position. Actually this should never be used, as bias should only be
         // invoked on non-terminal positions.
         debug_assert!(!game.0.is_victory());
@@ -281,7 +281,7 @@ impl Bias<ConnectFour> for ConnectFourBias {
         }
     }
 
-    fn unexplored(&self) -> Self::Evaluation {
+    fn unexplored_bias(&self) -> Self::Evaluation {
         CountWdlSolved::Undecided(CountWdl::default())
     }
 
@@ -306,10 +306,10 @@ impl PerfectBias {
     }
 }
 
-impl Bias<ConnectFour> for PerfectBias {
+impl Policy<ConnectFour> for PerfectBias {
     type Evaluation = CountWdlSolved;
 
-    fn bias(&mut self, game: ConnectFour, _: &mut impl Rng) -> CountWdlSolved {
+    fn initial_evaluation(&mut self, game: ConnectFour, _: &mut impl Rng) -> CountWdlSolved {
         let score = self.solver.score(&game.0);
         let current = game.current_player();
         match score.cmp(&0) {
@@ -330,7 +330,7 @@ impl Bias<ConnectFour> for PerfectBias {
         }
     }
 
-    fn unexplored(&self) -> Self::Evaluation {
+    fn unexplored_bias(&self) -> Self::Evaluation {
         CountWdlSolved::Undecided(CountWdl::default())
     }
 
@@ -346,7 +346,7 @@ fn use_tree_to_generate_move<B>(
     rng: &mut impl Rng,
 ) -> Column
 where
-    B: Bias<ConnectFour, Evaluation = CountWdlSolved>,
+    B: Policy<ConnectFour, Evaluation = CountWdlSolved>,
 {
     let tree = Tree::with_playouts(ConnectFour(game), bias, num_playouts, rng);
     eprintln!("nodes: {} links: {}", tree.num_nodes(), tree.num_links());
