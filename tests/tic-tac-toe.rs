@@ -1,7 +1,7 @@
 use std::ops::{Deref, DerefMut};
 
 use monte_carlo_tree_search::{
-    Policy, GameState, Player, RandomPlayoutUcb, RandomPlayoutUcbSolver, Tree, TwoPlayerGame,
+    Policy, GameState, Player, Ucb, RandomPlayoutUcbSolver, Tree, TwoPlayerGame,
     CountWdlSolved,
 };
 use rand::{rngs::StdRng, SeedableRng as _};
@@ -33,7 +33,7 @@ fn play_tic_tac_toe_using_ucb() {
 
     let num_playouts = 1_000;
     while !game.0.state().is_terminal() {
-        let tree = Tree::with_playouts(game, RandomPlayoutUcb::new(), num_playouts, &mut rng);
+        let tree = Tree::with_playouts(game, Ucb::new(), num_playouts, &mut rng);
         let best_move = tree.best_move().unwrap();
         game.play_move(&best_move);
         // use std::io::stderr;

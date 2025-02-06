@@ -18,11 +18,11 @@ pub trait Policy<G: TwoPlayerGame> {
     fn reevaluate(&mut self, game: G, previous_evaluation: Self::Evaluation) -> Self::Evaluation;
 }
 
-pub struct RandomPlayoutUcb<G: TwoPlayerGame> {
+pub struct Ucb<G: TwoPlayerGame> {
     move_buf: Vec<G::Move>,
 }
 
-impl<G> RandomPlayoutUcb<G>
+impl<G> Ucb<G>
 where
     G: TwoPlayerGame,
 {
@@ -33,7 +33,7 @@ where
     }
 }
 
-impl<G> Default for RandomPlayoutUcb<G>
+impl<G> Default for Ucb<G>
 where
     G: TwoPlayerGame,
 {
@@ -42,7 +42,7 @@ where
     }
 }
 
-impl<G> Policy<G> for RandomPlayoutUcb<G>
+impl<G> Policy<G> for Ucb<G>
 where
     G: TwoPlayerGame,
 {
