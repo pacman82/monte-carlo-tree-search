@@ -1,6 +1,6 @@
 use rand::{seq::IndexedRandom as _, Rng};
 
-use crate::{Evaluation, GameState, TwoPlayerGame, Ucb, UcbSolver};
+use crate::{Evaluation, GameState, TwoPlayerGame, CountWdl, UcbSolver};
 
 /// Used to obtain an ininitial bias for the outcome of a game starting from a given board.
 pub trait Bias<G: TwoPlayerGame> {
@@ -44,19 +44,19 @@ impl<G> Bias<G> for RandomPlayoutUcb<G>
 where
     G: TwoPlayerGame,
 {
-    type Evaluation = Ucb;
+    type Evaluation = CountWdl;
 
-    fn bias(&mut self, game: G, rng: &mut impl Rng) -> Ucb {
+    fn bias(&mut self, game: G, rng: &mut impl Rng) -> CountWdl {
         random_play(game, &mut self.move_buf, rng)
     }
 
-    fn unexplored(&self) -> Ucb {
-        Ucb::default()
+    fn unexplored(&self) -> CountWdl {
+        CountWdl::default()
     }
 
-    fn reevaluate(&mut self, _game: G, previous_evaluation: Ucb) -> Self::Evaluation {
+    fn reevaluate(&mut self, _game: G, previous_evaluation: CountWdl) -> Self::Evaluation {
         let increment_existing = |i| if i == 0 { 0 } else { i + 1 };
-        Ucb {
+        CountWdl {
             wins_player_one: increment_existing(previous_evaluation.wins_player_one),
             wins_player_two: increment_existing(previous_evaluation.wins_player_two),
             draws: increment_existing(previous_evaluation.draws),
@@ -94,7 +94,7 @@ where
     }
 
     fn unexplored(&self) -> UcbSolver {
-        UcbSolver::Undecided(Ucb::default())
+        UcbSolver::Undecided(CountWdl::default())
     }
 
     fn reevaluate(&mut self, _game: G, _previous_evaluation: UcbSolver) -> UcbSolver {
@@ -104,7 +104,7 @@ where
 
 /// Play random moves, until the game is over and report the score from the perspective of the
 /// player whose turn it is.
-pub fn random_play<G>(mut game: G, moves_buf: &mut Vec<G::Move>, rng: &mut impl Rng) -> Ucb
+pub fn random_play<G>(mut game: G, moves_buf: &mut Vec<G::Move>, rng: &mut impl Rng) -> CountWdl
 where
     G: TwoPlayerGame,
 {
@@ -115,21 +115,21 @@ where
                 game.play(selected_move)
             }
             GameState::WinPlayerOne => {
-                break Ucb {
+                break CountWdl {
                     wins_player_one: 1,
                     wins_player_two: 0,
                     draws: 0,
                 }
             }
             GameState::WinPlayerTwo => {
-                break Ucb {
+                break CountWdl {
                     wins_player_one: 0,
                     wins_player_two: 1,
                     draws: 0,
                 }
             }
             GameState::Draw => {
-                break Ucb {
+                break CountWdl {
                     wins_player_one: 0,
                     wins_player_two: 0,
                     draws: 1,

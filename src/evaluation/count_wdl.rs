@@ -9,13 +9,13 @@ use super::Evaluation;
 
 /// Counts accumulated wins, losses and draws for this part of the tree
 #[derive(Default, Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Ucb {
+pub struct CountWdl {
     pub wins_player_one: i32,
     pub wins_player_two: i32,
     pub draws: i32,
 }
 
-impl Ucb {
+impl CountWdl {
     /// A value between 0 and 1 indicating, how rewarding this outcome is for the given player. 0
     /// indicates a loss, 1 a win and 0.5 a draw. However 0.5 could also indicate an outcome which
     /// is very undecided and poses and advantage for neither player. The reward function does
@@ -54,7 +54,7 @@ impl Ucb {
     }
 }
 
-impl AddAssign for Ucb {
+impl AddAssign for CountWdl {
     fn add_assign(&mut self, other: Self) {
         self.wins_player_one += other.wins_player_one;
         self.wins_player_two += other.wins_player_two;
@@ -62,7 +62,7 @@ impl AddAssign for Ucb {
     }
 }
 
-impl SubAssign for Ucb {
+impl SubAssign for CountWdl {
     fn sub_assign(&mut self, other: Self) {
         self.wins_player_one -= other.wins_player_one;
         self.wins_player_two -= other.wins_player_two;
@@ -70,8 +70,8 @@ impl SubAssign for Ucb {
     }
 }
 
-impl Evaluation for Ucb {
-    type Delta = Ucb;
+impl Evaluation for CountWdl {
+    type Delta = CountWdl;
 
     fn cmp_for(&self, other: &Self, player: Player) -> Ordering {
         self.reward(player)
@@ -103,22 +103,22 @@ impl Evaluation for Ucb {
 
     fn init_from_game_state<M>(state: &GameState<'_, M>) -> Self {
         match state {
-            GameState::WinPlayerOne => Ucb {
+            GameState::WinPlayerOne => CountWdl {
                 wins_player_one: 1,
                 wins_player_two: 0,
                 draws: 0,
             },
-            GameState::WinPlayerTwo => Ucb {
+            GameState::WinPlayerTwo => CountWdl {
                 wins_player_one: 0,
                 wins_player_two: 1,
                 draws: 0,
             },
-            GameState::Draw => Ucb {
+            GameState::Draw => CountWdl {
                 wins_player_one: 0,
                 wins_player_two: 0,
                 draws: 1,
             },
-            GameState::Moves(_) => Ucb::default(),
+            GameState::Moves(_) => CountWdl::default(),
         }
     }
 }

@@ -1,4 +1,4 @@
-mod ucb;
+mod count_wdl;
 mod ucb_solver;
 
 use std::cmp::Ordering;
@@ -6,7 +6,7 @@ use std::cmp::Ordering;
 use crate::{GameState, Player};
 
 pub use self::{
-    ucb::Ucb,
+    count_wdl::CountWdl,
     ucb_solver::{CountOrDecidedDelta, UcbSolver},
 };
 

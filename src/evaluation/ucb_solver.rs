@@ -2,7 +2,7 @@ use std::cmp::Ordering;
 
 use crate::{GameState, Player};
 
-use super::{Evaluation, Ucb};
+use super::{Evaluation, CountWdl};
 
 /// Use an Upper Confidence Bound to select the next node to expand. In addition to the use of the
 /// "classic" upper confidence bound, this evaluation also features variants for states such as
@@ -21,7 +21,7 @@ pub enum UcbSolver {
     /// The board has been proven to be a draw, given perfect play of both players.
     Draw,
     /// The outcome could not yet be proven to be either a win, loss or draw.
-    Undecided(Ucb),
+    Undecided(CountWdl),
 }
 
 impl UcbSolver {
@@ -34,15 +34,15 @@ impl UcbSolver {
     }
 
     /// Convert solved solutions to their underterministic counter part
-    pub(crate) fn into_count(self) -> Ucb {
+    pub(crate) fn into_count(self) -> CountWdl {
         match self {
             UcbSolver::Undecided(count) => count,
-            UcbSolver::Draw => Ucb {
+            UcbSolver::Draw => CountWdl {
                 draws: 1,
-                ..Ucb::default()
+                ..CountWdl::default()
             },
             UcbSolver::Win(player) => {
-                let mut count = Ucb::default();
+                let mut count = CountWdl::default();
                 count.report_win_for(player);
                 count
             }
@@ -159,7 +159,7 @@ impl Evaluation for UcbSolver {
         // No deterministic outcome, let's propagete the counts
         let propageted_count = match propagated_evaluation {
             UcbSolver::Win(Player::One) => {
-                let mut count = Ucb {
+                let mut count = CountWdl {
                     wins_player_one: previous_child_count.total() + propagated_evaluation.total(),
                     ..Default::default()
                 };
@@ -167,7 +167,7 @@ impl Evaluation for UcbSolver {
                 count
             }
             UcbSolver::Win(Player::Two) => {
-                let mut count = Ucb {
+                let mut count = CountWdl {
                     wins_player_two: previous_child_count.total() + propagated_evaluation.total(),
                     ..Default::default()
                 };
@@ -175,7 +175,7 @@ impl Evaluation for UcbSolver {
                 count
             }
             UcbSolver::Draw => {
-                let mut count = Ucb {
+                let mut count = CountWdl {
                     draws: previous_child_count.total() + propagated_evaluation.total(),
                     ..Default::default()
                 };
@@ -218,13 +218,13 @@ impl Evaluation for UcbSolver {
     fn initial_delta(&self) -> Self::Delta {
         CountOrDecidedDelta {
             propagated_evaluation: *self,
-            previous_count: Ucb::default(),
+            previous_count: CountWdl::default(),
         }
     }
 
     fn init_from_game_state<M>(state: &GameState<'_, M>) -> Self {
         match state {
-            GameState::Moves(_) => UcbSolver::Undecided(Ucb::default()),
+            GameState::Moves(_) => UcbSolver::Undecided(CountWdl::default()),
             GameState::Draw => UcbSolver::Draw,
             GameState::WinPlayerOne => UcbSolver::Win(Player::One),
             GameState::WinPlayerTwo => UcbSolver::Win(Player::Two),
@@ -234,7 +234,7 @@ impl Evaluation for UcbSolver {
 
 impl Default for UcbSolver {
     fn default() -> Self {
-        Self::Undecided(Ucb::default())
+        Self::Undecided(CountWdl::default())
     }
 }
 
@@ -246,14 +246,14 @@ pub struct CountOrDecidedDelta {
     /// The count of the child before the change. We can assume the child has been in the
     /// [`CountOrDecided::Undecided`] state before the change. Otherwise it would not have been
     /// selected for expansion.
-    pub previous_count: Ucb,
+    pub previous_count: CountWdl,
 }
 
 #[cfg(test)]
 mod test {
     use std::cmp::Ordering;
 
-    use crate::{Evaluation as _, Player, Ucb, UcbSolver};
+    use crate::{Evaluation as _, Player, CountWdl, UcbSolver};
 
     #[test]
     fn compare_evaluations() {
@@ -279,9 +279,9 @@ mod test {
         assert_eq!(draw.cmp_for(&draw, one), Ordering::Equal);
         assert_eq!(
             draw.cmp_for(
-                &UcbSolver::Undecided(Ucb {
+                &UcbSolver::Undecided(CountWdl {
                     draws: 1,
-                    ..Ucb::default()
+                    ..CountWdl::default()
                 }),
                 one
             ),
@@ -289,39 +289,39 @@ mod test {
         );
         assert_eq!(
             draw.cmp_for(
-                &UcbSolver::Undecided(Ucb {
+                &UcbSolver::Undecided(CountWdl {
                     wins_player_one: 1,
-                    ..Ucb::default()
+                    ..CountWdl::default()
                 }),
                 one
             ),
             Ordering::Less
         );
         assert_eq!(
-            UcbSolver::Undecided(Ucb {
+            UcbSolver::Undecided(CountWdl {
                 wins_player_one: 1,
-                ..Ucb::default()
+                ..CountWdl::default()
             })
             .cmp_for(&win_player_one, one),
             Ordering::Less
         );
         assert_eq!(
-            UcbSolver::Undecided(Ucb {
+            UcbSolver::Undecided(CountWdl {
                 wins_player_two: 1,
-                ..Ucb::default()
+                ..CountWdl::default()
             })
             .cmp_for(&win_player_two, one),
             Ordering::Greater
         );
         assert_eq!(
-            UcbSolver::Undecided(Ucb {
+            UcbSolver::Undecided(CountWdl {
                 wins_player_one: 1,
-                ..Ucb::default()
+                ..CountWdl::default()
             })
             .cmp_for(
-                &UcbSolver::Undecided(Ucb {
+                &UcbSolver::Undecided(CountWdl {
                     wins_player_two: 1,
-                    ..Ucb::default()
+                    ..CountWdl::default()
                 }),
                 one
             ),

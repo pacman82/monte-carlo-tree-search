@@ -6,7 +6,7 @@ use std::{
 
 use connect_four_solver::{Column, Solver};
 use monte_carlo_tree_search::{
-    Bias, GameState, Player, RandomPlayoutUcbSolver, Tree, TwoPlayerGame, Ucb, UcbSolver,
+    Bias, GameState, Player, RandomPlayoutUcbSolver, Tree, TwoPlayerGame, CountWdl, UcbSolver,
 };
 use rand::{rngs::StdRng, seq::IndexedRandom as _, Rng, SeedableRng};
 
@@ -257,14 +257,14 @@ impl Bias<ConnectFour> for ConnectFourBias {
                     unreachable!("Should have detected winning move beforehand")
                 }
                 GameState::Draw => {
-                    return UcbSolver::Undecided(Ucb {
+                    return UcbSolver::Undecided(CountWdl {
                         draws: 1,
-                        ..Ucb::default()
+                        ..CountWdl::default()
                     })
                 }
             }
             if game.0.can_win_in_next_move() {
-                let mut count = Ucb::default();
+                let mut count = CountWdl::default();
                 count.report_win_for(game.current_player());
                 return UcbSolver::Undecided(count);
             }
@@ -274,7 +274,7 @@ impl Bias<ConnectFour> for ConnectFourBias {
                 game.play(next_move);
             } else {
                 // No move available which would not allow our opponent to win, so we loose.
-                let mut count = Ucb::default();
+                let mut count = CountWdl::default();
                 count.report_win_for(game.current_player().opponent());
                 return UcbSolver::Undecided(count);
             }
@@ -282,7 +282,7 @@ impl Bias<ConnectFour> for ConnectFourBias {
     }
 
     fn unexplored(&self) -> Self::Evaluation {
-        UcbSolver::Undecided(Ucb::default())
+        UcbSolver::Undecided(CountWdl::default())
     }
 
     fn reevaluate(&mut self, _game: ConnectFour, _previous_evaluation: UcbSolver) -> UcbSolver {
@@ -313,17 +313,17 @@ impl Bias<ConnectFour> for PerfectBias {
         let score = self.solver.score(&game.0);
         let current = game.current_player();
         match score.cmp(&0) {
-            Ordering::Equal => UcbSolver::Undecided(Ucb {
+            Ordering::Equal => UcbSolver::Undecided(CountWdl {
                 draws: 1,
                 ..Default::default()
             }),
             Ordering::Greater => {
-                let mut count = Ucb::default();
+                let mut count = CountWdl::default();
                 count.report_win_for(current);
                 UcbSolver::Undecided(count)
             }
             Ordering::Less => {
-                let mut count = Ucb::default();
+                let mut count = CountWdl::default();
                 count.report_win_for(current.opponent());
                 UcbSolver::Undecided(count)
             }
@@ -331,7 +331,7 @@ impl Bias<ConnectFour> for PerfectBias {
     }
 
     fn unexplored(&self) -> Self::Evaluation {
-        UcbSolver::Undecided(Ucb::default())
+        UcbSolver::Undecided(CountWdl::default())
     }
 
     fn reevaluate(&mut self, _game: ConnectFour, _previous_evaluation: UcbSolver) -> UcbSolver {
