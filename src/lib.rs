@@ -5,7 +5,7 @@ mod tree;
 mod two_player_game;
 
 pub use self::{
-    policy::{random_play, Policy, Ucb, RandomPlayoutUcbSolver},
+    policy::{random_play, Policy, Ucb, UcbSolver},
     evaluation::{CountOrDecidedDelta, Evaluation, CountWdl, CountWdlSolved},
     player::Player,
     tree::Tree,

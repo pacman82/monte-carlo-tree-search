@@ -67,11 +67,11 @@ where
 }
 
 /// Obtain an initial bias by playing random moves and reporting the outcome.
-pub struct RandomPlayoutUcbSolver<G: TwoPlayerGame> {
+pub struct UcbSolver<G: TwoPlayerGame> {
     move_buf: Vec<G::Move>,
 }
 
-impl<G: TwoPlayerGame> RandomPlayoutUcbSolver<G> {
+impl<G: TwoPlayerGame> UcbSolver<G> {
     pub fn new() -> Self {
         Self {
             move_buf: Vec::new(),
@@ -79,13 +79,13 @@ impl<G: TwoPlayerGame> RandomPlayoutUcbSolver<G> {
     }
 }
 
-impl<G: TwoPlayerGame> Default for RandomPlayoutUcbSolver<G> {
+impl<G: TwoPlayerGame> Default for UcbSolver<G> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<G> Policy<G> for RandomPlayoutUcbSolver<G>
+impl<G> Policy<G> for UcbSolver<G>
 where
     G: TwoPlayerGame,
 {

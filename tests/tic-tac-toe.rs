@@ -1,7 +1,7 @@
 use std::ops::{Deref, DerefMut};
 
 use monte_carlo_tree_search::{
-    Policy, GameState, Player, Ucb, RandomPlayoutUcbSolver, Tree, TwoPlayerGame,
+    Policy, GameState, Player, Ucb, UcbSolver, Tree, TwoPlayerGame,
     CountWdlSolved,
 };
 use rand::{rngs::StdRng, SeedableRng as _};
@@ -14,7 +14,7 @@ fn play_tic_tac_toe_using_ucb_solver() {
 
     let num_playouts = 1_000;
     while !game.0.state().is_terminal() {
-        let tree = Tree::with_playouts(game, RandomPlayoutUcbSolver::new(), num_playouts, &mut rng);
+        let tree = Tree::with_playouts(game, UcbSolver::new(), num_playouts, &mut rng);
         let best_move = tree.best_move().unwrap();
         game.play_move(&best_move);
         // use std::io::stderr;
@@ -51,7 +51,7 @@ fn backpropagation_of_draw() {
 
     let num_playouts = 1_000;
 
-    let tree = Tree::with_playouts(game, RandomPlayoutUcbSolver::new(), num_playouts, &mut rng);
+    let tree = Tree::with_playouts(game, UcbSolver::new(), num_playouts, &mut rng);
     let best_move = tree.best_move().unwrap();
     game.play_move(&best_move);
 
@@ -68,7 +68,7 @@ fn solve_tic_tac_toe() {
     // solve the game. In actuality, we are likely to solve it with fewer playouts, as will be
     // indicated by the number of nodes in the tree.
     let num_playouts = 362_880;
-    let tree = Tree::with_playouts(game, RandomPlayoutUcbSolver::new(), num_playouts, &mut rng);
+    let tree = Tree::with_playouts(game, UcbSolver::new(), num_playouts, &mut rng);
     eprintln!("nodes: {} links: {}", tree.num_nodes(), tree.num_links());
     print_move_statistics(&tree);
 
@@ -96,7 +96,7 @@ fn prevent_immediate_win_of_player_two() {
     // game.print_to(stderr()).unwrap();
 
     let num_playouts = 34;
-    let tree = Tree::with_playouts(game, RandomPlayoutUcbSolver::new(), num_playouts, &mut rng);
+    let tree = Tree::with_playouts(game, UcbSolver::new(), num_playouts, &mut rng);
     print_move_statistics(&tree);
     assert_eq!(CellIndex::new(7), tree.best_move().unwrap());
 }
@@ -122,7 +122,7 @@ fn prevent_immediate_win_of_player_one() {
     // game.print_to(stderr()).unwrap();
 
     let num_playouts = 25;
-    let tree = Tree::with_playouts(game, RandomPlayoutUcbSolver::new(), num_playouts, &mut rng);
+    let tree = Tree::with_playouts(game, UcbSolver::new(), num_playouts, &mut rng);
     print_move_statistics(&tree);
     assert_eq!(CellIndex::new(1), tree.best_move().unwrap());
 }
@@ -158,7 +158,7 @@ fn report_win_if_initialized_with_terminal_position() {
     // game.print_to(stderr()).unwrap();
 
     let num_playouts = 1;
-    let tree = Tree::with_playouts(game, RandomPlayoutUcbSolver::new(), num_playouts, &mut rng);
+    let tree = Tree::with_playouts(game, UcbSolver::new(), num_playouts, &mut rng);
 
     assert_eq!(CountWdlSolved::Win(Player::One), tree.evaluation())
 }
@@ -187,7 +187,7 @@ fn solve_draw_in_one_move() {
 
     // RNG works out in a way, that if we seed 42 this would work with one playout
     let num_playouts = 1;
-    let tree = Tree::with_playouts(game, RandomPlayoutUcbSolver::new(), num_playouts, &mut rng);
+    let tree = Tree::with_playouts(game, UcbSolver::new(), num_playouts, &mut rng);
 
     print_move_statistics(&tree);
     assert_eq!(CountWdlSolved::Draw, tree.evaluation());
@@ -217,7 +217,7 @@ fn solve_draw_in_two_moves() {
 
     // RNG works out in a way, that if we seed 42 this would work with one playout
     let num_playouts = 4;
-    let tree = Tree::with_playouts(game, RandomPlayoutUcbSolver::new(), num_playouts, &mut rng);
+    let tree = Tree::with_playouts(game, UcbSolver::new(), num_playouts, &mut rng);
 
     print_move_statistics(&tree);
     assert_eq!(CountWdlSolved::Draw, tree.evaluation());
@@ -246,7 +246,7 @@ fn solve_draw_in_three_moves() {
 
     // RNG works out in a way, that if we seed 42 this would work with one playout
     let num_playouts = 15;
-    let tree = Tree::with_playouts(game, RandomPlayoutUcbSolver::new(), num_playouts, &mut rng);
+    let tree = Tree::with_playouts(game, UcbSolver::new(), num_playouts, &mut rng);
 
     print_move_statistics(&tree);
     assert_eq!(CountWdlSolved::Draw, tree.evaluation());
@@ -273,7 +273,7 @@ fn solve_win_in_one_move() {
 
     // RNG works out in a way, that if we seed 42 this would work with one playout
     let num_playouts = 3;
-    let tree = Tree::with_playouts(game, RandomPlayoutUcbSolver::new(), num_playouts, &mut rng);
+    let tree = Tree::with_playouts(game, UcbSolver::new(), num_playouts, &mut rng);
 
     assert_eq!(CountWdlSolved::Win(Player::One), tree.evaluation());
     assert_eq!(CellIndex::new(3), tree.best_move().unwrap())
@@ -299,7 +299,7 @@ fn solve_defeat_in_two_moves() {
     // game.print_to(stderr()).unwrap();
 
     let num_playouts = 15;
-    let tree = Tree::with_playouts(game, RandomPlayoutUcbSolver::new(), num_playouts, &mut rng);
+    let tree = Tree::with_playouts(game, UcbSolver::new(), num_playouts, &mut rng);
 
     assert_eq!(CountWdlSolved::Win(Player::One), tree.evaluation());
     print_move_statistics(&tree);
@@ -322,7 +322,7 @@ fn solve_win_in_five_moves() {
     // game.print_to(stderr()).unwrap();
 
     let num_playouts = 312;
-    let tree = Tree::with_playouts(game, RandomPlayoutUcbSolver::new(), num_playouts, &mut rng);
+    let tree = Tree::with_playouts(game, UcbSolver::new(), num_playouts, &mut rng);
 
     print_move_statistics(&tree);
     assert_eq!(CountWdlSolved::Win(Player::One), tree.evaluation());
@@ -334,7 +334,7 @@ fn solve_win_in_five_moves() {
 fn unexplored_root_childs() {
     let game = TicTacToe::new();
 
-    let tree = Tree::new(game, RandomPlayoutUcbSolver::new());
+    let tree = Tree::new(game, UcbSolver::new());
 
     assert!(tree.best_move().is_some());
     // Just iterate to see that we do not panic in case child is unexplored
