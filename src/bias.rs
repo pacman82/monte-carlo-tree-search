@@ -1,6 +1,6 @@
 use rand::{seq::IndexedRandom as _, Rng};
 
-use crate::{Evaluation, GameState, TwoPlayerGame, CountWdl, UcbSolver};
+use crate::{Evaluation, GameState, TwoPlayerGame, CountWdl, CountWdlSolved};
 
 /// Used to obtain an ininitial bias for the outcome of a game starting from a given board.
 pub trait Bias<G: TwoPlayerGame> {
@@ -87,17 +87,17 @@ impl<G> Bias<G> for RandomPlayoutUcbSolver<G>
 where
     G: TwoPlayerGame,
 {
-    type Evaluation = UcbSolver;
+    type Evaluation = CountWdlSolved;
 
-    fn bias(&mut self, game: G, rng: &mut impl Rng) -> UcbSolver {
-        UcbSolver::Undecided(random_play(game, &mut self.move_buf, rng))
+    fn bias(&mut self, game: G, rng: &mut impl Rng) -> CountWdlSolved {
+        CountWdlSolved::Undecided(random_play(game, &mut self.move_buf, rng))
     }
 
-    fn unexplored(&self) -> UcbSolver {
-        UcbSolver::Undecided(CountWdl::default())
+    fn unexplored(&self) -> CountWdlSolved {
+        CountWdlSolved::Undecided(CountWdl::default())
     }
 
-    fn reevaluate(&mut self, _game: G, _previous_evaluation: UcbSolver) -> UcbSolver {
+    fn reevaluate(&mut self, _game: G, _previous_evaluation: CountWdlSolved) -> CountWdlSolved {
         unreachable!("Solver should never visit the same leaf twice")
     }
 }

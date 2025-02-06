@@ -1,5 +1,5 @@
 mod count_wdl;
-mod ucb_solver;
+mod count_wdl_solved;
 
 use std::cmp::Ordering;
 
@@ -7,7 +7,7 @@ use crate::{GameState, Player};
 
 pub use self::{
     count_wdl::CountWdl,
-    ucb_solver::{CountOrDecidedDelta, UcbSolver},
+    count_wdl_solved::{CountOrDecidedDelta, CountWdlSolved},
 };
 
 /// Controls what information is stored for each board remembered in the nodes of the tree, how

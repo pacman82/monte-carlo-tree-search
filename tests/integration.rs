@@ -1,5 +1,5 @@
 use monte_carlo_tree_search::{
-    GameState, Player, RandomPlayoutUcbSolver, Tree, TwoPlayerGame, UcbSolver,
+    GameState, Player, RandomPlayoutUcbSolver, Tree, TwoPlayerGame, CountWdlSolved,
 };
 
 #[test]
@@ -27,5 +27,5 @@ fn player_one_always_wins() {
 
     let tree = Tree::new(game, RandomPlayoutUcbSolver::new());
 
-    assert_eq!(UcbSolver::Win(Player::One), tree.evaluation());
+    assert_eq!(CountWdlSolved::Win(Player::One), tree.evaluation());
 }
