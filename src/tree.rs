@@ -2,17 +2,17 @@ use std::cmp::Ordering;
 
 use rand::{seq::IndexedRandom as _, Rng};
 
-use crate::{Policy, Evaluation, Player, TwoPlayerGame};
+use crate::{Evaluation, Player, Policy, TwoPlayerGame};
 
 /// A tree there the nodes represent game states and the links represent moves. The tree does only
 /// store the root game state and reconstruct the nodes based on the moves. It does store an
 /// evaluation for each node though. The evaluation is updated during each playout.
-pub struct Tree<G: TwoPlayerGame, B: Policy<G>> {
+pub struct Tree<G: TwoPlayerGame, P: Policy<G>> {
     /// Game state of the root node.
     game: G,
     /// We store all the nodes of the tree in a vector to avoid allocations. We refer to the nodes
     /// using indices.
-    nodes: Vec<Node<B::Evaluation>>,
+    nodes: Vec<Node<P::Evaluation>>,
     /// Since we want to support Nodes with arbitrary many links, we store the links in their own
     /// vector. Each node will have a range in this vector indicated by a start and end index. We
     /// use usize::Max to indicate, that the node is not expanded yet.
@@ -32,18 +32,18 @@ pub struct Tree<G: TwoPlayerGame, B: Policy<G>> {
     /// we would take the longest to realize it is a loose, is likely the one which allows the
     /// opponent to make the most mistakes.
     best_link: Option<usize>,
-    /// Used to get an initial estimate of the outcome of a new node.
-    bias: B,
+    /// Controls selection, evaluation and backpropagation.
+    policy: P,
 }
 
-impl<G, B> Tree<G, B>
+impl<G, P> Tree<G, P>
 where
     G: TwoPlayerGame,
-    B: Policy<G>,
+    P: Policy<G>,
 {
-    pub fn new(game: G, bias: B) -> Self {
+    pub fn new(game: G, policy: P) -> Self {
         let mut move_buf = Vec::new();
-        let estimated_outcome = B::Evaluation::init_from_game_state(&game.state(&mut move_buf));
+        let estimated_outcome = P::Evaluation::init_from_game_state(&game.state(&mut move_buf));
         let root = Node::new(usize::MAX, 0, move_buf.len(), estimated_outcome);
         let nodes = vec![root];
         let links: Vec<_> = move_buf
@@ -63,12 +63,12 @@ where
             move_buf,
             candidate_link_index_buf: Vec::new(),
             best_link,
-            bias,
+            policy,
         }
     }
 
-    pub fn with_playouts(game: G, bias: B, num_playouts: u32, rng: &mut impl Rng) -> Self {
-        let mut tree = Self::new(game, bias);
+    pub fn with_playouts(game: G, policy: P, num_playouts: u32, rng: &mut impl Rng) -> Self {
+        let mut tree = Self::new(game, policy);
         for _ in 0..num_playouts {
             if !tree.playout(rng) {
                 break;
@@ -102,7 +102,7 @@ where
 
         // If the game is not in a terminal state, start a simulation to gain an initial estimate
         if !self.nodes[new_node_index].evaluation.is_solved() {
-            let bias = self.bias.initial_evaluation(game, rng);
+            let bias = self.policy.bias(game, rng);
             self.nodes[new_node_index].evaluation = bias;
         }
 
@@ -130,11 +130,11 @@ where
     }
 
     /// Count of playouts of the root node.
-    pub fn evaluation(&self) -> B::Evaluation {
+    pub fn evaluation(&self) -> P::Evaluation {
         self.nodes[0].evaluation
     }
 
-    pub fn eval_by_move(&self) -> impl Iterator<Item = (G::Move, B::Evaluation)> + '_ {
+    pub fn eval_by_move(&self) -> impl Iterator<Item = (G::Move, P::Evaluation)> + '_ {
         let root = &self.nodes[0];
         self.links[root.children_begin..root.children_end]
             .iter()
@@ -143,7 +143,7 @@ where
                     let child = &self.nodes[link.child];
                     (link.move_, child.evaluation)
                 } else {
-                    (link.move_, self.bias.unexplored_bias())
+                    (link.move_, self.policy.unexplored_bias())
                 }
             })
     }
@@ -212,7 +212,7 @@ where
         link.child = new_node_index;
         let grandchildren_begin = self.links.len();
         let grandchildren_end = grandchildren_begin + new_node_game_state.moves().len();
-        let eval = B::Evaluation::init_from_game_state(&new_node_game_state);
+        let eval = P::Evaluation::init_from_game_state(&new_node_game_state);
         self.links.extend(self.move_buf.drain(..).map(|move_| Link {
             child: usize::MAX,
             move_,
@@ -259,7 +259,7 @@ where
         &self,
         parent_index: usize,
         child_index: usize,
-    ) -> impl Iterator<Item = Option<B::Evaluation>> + '_ {
+    ) -> impl Iterator<Item = Option<P::Evaluation>> + '_ {
         self.child_links(parent_index).filter_map(move |link| {
             if link.is_explored() {
                 if link.child == child_index {
@@ -292,12 +292,12 @@ where
     }
 
     /// Evaluation of a node the link directs to. Handles unexplored nodes.
-    fn evaluation_by_link_index(&self, link_index: usize) -> B::Evaluation {
+    fn evaluation_by_link_index(&self, link_index: usize) -> P::Evaluation {
         let link = self.links[link_index];
         if link.is_explored() {
             self.nodes[link.child].evaluation
         } else {
-            self.bias.unexplored_bias()
+            self.policy.unexplored_bias()
         }
     }
 

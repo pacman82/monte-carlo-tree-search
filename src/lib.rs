@@ -1,13 +1,15 @@
-mod policy;
 mod evaluation;
 mod player;
+mod policy;
 mod tree;
 mod two_player_game;
 
 pub use self::{
-    policy::{random_play, Policy, Ucb, UcbSolver},
-    evaluation::{CountOrDecidedDelta, Evaluation, CountWdl, CountWdlSolved},
+    evaluation::{CountOrDecidedDelta, CountWdl, CountWdlSolved, Evaluation},
     player::Player,
+    policy::{
+        random_play, CountWdlBias, CountWdlSolvedBias, Policy, RandomPlayout, Ucb, UcbSolver,
+    },
     tree::Tree,
     two_player_game::{GameState, TwoPlayerGame},
 };

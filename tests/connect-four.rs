@@ -6,7 +6,8 @@ use std::{
 
 use connect_four_solver::{Column, Solver};
 use monte_carlo_tree_search::{
-    Policy, GameState, Player, UcbSolver, Tree, TwoPlayerGame, CountWdl, CountWdlSolved,
+    CountWdl, CountWdlSolved, CountWdlSolvedBias, GameState, Player, Policy, RandomPlayout, Tree,
+    TwoPlayerGame, UcbSolver,
 };
 use rand::{rngs::StdRng, seq::IndexedRandom as _, Rng, SeedableRng};
 
@@ -16,7 +17,12 @@ fn play_move_connect_four() {
     let game = ConnectFour::new();
     let num_playouts = 100;
 
-    let tree = Tree::with_playouts(game, UcbSolver::new(), num_playouts, &mut rng);
+    let tree = Tree::with_playouts(
+        game,
+        UcbSolver::<RandomPlayout<_>>::new(),
+        num_playouts,
+        &mut rng,
+    );
 
     for (move_, eval) in tree.eval_by_move() {
         eprintln!("Eval child {:?}: {:?} ", move_, eval,);
@@ -27,7 +33,7 @@ fn play_move_connect_four() {
 fn start_from_terminal_position() {
     // First player has won
     let game = ConnectFour::from_move_list("1212121");
-    let tree = Tree::new(game, UcbSolver::new());
+    let tree = Tree::new(game, UcbSolver::<RandomPlayout<_>>::new());
 
     assert_eq!(CountWdlSolved::Win(Player::One), tree.evaluation());
 }
@@ -49,7 +55,12 @@ fn position_424424455557722225141717() {
 
     let mut rng = StdRng::seed_from_u64(42);
     let num_playouts = 1_000;
-    let tree = Tree::with_playouts(game, UcbSolver::new(), num_playouts, &mut rng);
+    let tree = Tree::with_playouts(
+        game,
+        UcbSolver::<RandomPlayout<_>>::new(),
+        num_playouts,
+        &mut rng,
+    );
     print_move_statistics(&tree);
     assert_eq!(Column::from_index(0), tree.best_move().unwrap());
 }
@@ -72,7 +83,12 @@ fn position_42442445555772222514171() {
 
     let mut rng = StdRng::seed_from_u64(42);
     let num_playouts = 1000;
-    let tree = Tree::with_playouts(game, UcbSolver::new(), num_playouts, &mut rng);
+    let tree = Tree::with_playouts(
+        game,
+        UcbSolver::<RandomPlayout<_>>::new(),
+        num_playouts,
+        &mut rng,
+    );
     print_move_statistics(&tree);
     assert!(tree
         .eval_by_move()
@@ -93,8 +109,12 @@ fn beat_perfect_solver_as_player_one() {
         let next_move = match game.current_player() {
             Player::One => {
                 let num_playouts = 20_000;
-                let tree =
-                    Tree::with_playouts(game, ConnectFourBias::new(), num_playouts, &mut rng);
+                let tree = Tree::with_playouts(
+                    game,
+                    UcbSolver::<ConnectFourBias>::new(),
+                    num_playouts,
+                    &mut rng,
+                );
                 eprintln!("nodes: {} links: {}", tree.num_nodes(), tree.num_links());
                 print_move_statistics(&tree);
                 tree.best_move().unwrap()
@@ -131,7 +151,7 @@ fn play_against_yourself() {
         } else {
             // Player Two
             eprintln!("Player Two");
-            let bias = UcbSolver::new();
+            let bias = RandomPlayout::new();
             let num_playouts = 100_000;
             use_tree_to_generate_move(game, num_playouts, bias, &mut rng)
         };
@@ -151,7 +171,12 @@ fn solve_connect_four() {
     let game = ConnectFour::new();
     let num_playouts = 1_000;
 
-    let tree = Tree::with_playouts(game, PerfectBias::new(), num_playouts, &mut rng);
+    let tree = Tree::with_playouts(
+        game,
+        UcbSolver::with_bias(PerfectBias::new()),
+        num_playouts,
+        &mut rng,
+    );
     print_move_statistics(&tree);
     assert_eq!(CountWdlSolved::Win(Player::One), tree.evaluation());
 }
@@ -235,10 +260,14 @@ impl ConnectFourBias {
     }
 }
 
-impl Policy<ConnectFour> for ConnectFourBias {
-    type Evaluation = CountWdlSolved;
+impl Default for ConnectFourBias {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
-    fn initial_evaluation(&mut self, mut game: ConnectFour, rng: &mut impl Rng) -> CountWdlSolved {
+impl CountWdlSolvedBias<ConnectFour> for ConnectFourBias {
+    fn bias(&mut self, mut game: ConnectFour, rng: &mut impl Rng) -> CountWdlSolved {
         // Check for terminal position. Actually this should never be used, as bias should only be
         // invoked on non-terminal positions.
         debug_assert!(!game.0.is_victory());
@@ -280,14 +309,6 @@ impl Policy<ConnectFour> for ConnectFourBias {
             }
         }
     }
-
-    fn unexplored_bias(&self) -> Self::Evaluation {
-        CountWdlSolved::Undecided(CountWdl::default())
-    }
-
-    fn reevaluate(&mut self, _game: ConnectFour, _previous_evaluation: CountWdlSolved) -> CountWdlSolved {
-        unreachable!("Solver will not consider the same leaf twice")
-    }
 }
 
 /// Uses a perfect solver to generate a bias. We use this to explore how much good bias can help to
@@ -306,10 +327,8 @@ impl PerfectBias {
     }
 }
 
-impl Policy<ConnectFour> for PerfectBias {
-    type Evaluation = CountWdlSolved;
-
-    fn initial_evaluation(&mut self, game: ConnectFour, _: &mut impl Rng) -> CountWdlSolved {
+impl CountWdlSolvedBias<ConnectFour> for PerfectBias {
+    fn bias(&mut self, game: ConnectFour, _: &mut impl Rng) -> CountWdlSolved {
         let score = self.solver.score(&game.0);
         let current = game.current_player();
         match score.cmp(&0) {
@@ -329,14 +348,6 @@ impl Policy<ConnectFour> for PerfectBias {
             }
         }
     }
-
-    fn unexplored_bias(&self) -> Self::Evaluation {
-        CountWdlSolved::Undecided(CountWdl::default())
-    }
-
-    fn reevaluate(&mut self, _game: ConnectFour, _previous_evaluation: CountWdlSolved) -> CountWdlSolved {
-        unreachable!("Solver will not consider the same leaf twice")
-    }
 }
 
 fn use_tree_to_generate_move<B>(
@@ -346,9 +357,14 @@ fn use_tree_to_generate_move<B>(
     rng: &mut impl Rng,
 ) -> Column
 where
-    B: Policy<ConnectFour, Evaluation = CountWdlSolved>,
+    B: CountWdlSolvedBias<ConnectFour>,
 {
-    let tree = Tree::with_playouts(ConnectFour(game), bias, num_playouts, rng);
+    let tree = Tree::with_playouts(
+        ConnectFour(game),
+        UcbSolver::with_bias(bias),
+        num_playouts,
+        rng,
+    );
     eprintln!("nodes: {} links: {}", tree.num_nodes(), tree.num_links());
     print_move_statistics(&tree);
     tree.best_move().unwrap()

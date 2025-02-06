@@ -1,6 +1,6 @@
 use rand::{seq::IndexedRandom as _, Rng};
 
-use crate::{Evaluation, GameState, TwoPlayerGame, CountWdl, CountWdlSolved};
+use crate::{CountWdl, CountWdlSolved, Evaluation, GameState, TwoPlayerGame};
 
 /// Control selection, evaluation and backpropagation.
 pub trait Policy<G: TwoPlayerGame> {
@@ -8,7 +8,7 @@ pub trait Policy<G: TwoPlayerGame> {
     type Evaluation: Evaluation;
 
     /// Initial evaluation of a newly expanded node
-    fn initial_evaluation(&mut self, game: G, rng: &mut impl Rng) -> Self::Evaluation;
+    fn bias(&mut self, game: G, rng: &mut impl Rng) -> Self::Evaluation;
 
     /// Evaluation given to unexplored nodes for the purpose of choosing the best node from root.
     /// This evaluation is not used during selection phase
@@ -48,7 +48,7 @@ where
 {
     type Evaluation = CountWdl;
 
-    fn initial_evaluation(&mut self, game: G, rng: &mut impl Rng) -> CountWdl {
+    fn bias(&mut self, game: G, rng: &mut impl Rng) -> CountWdl {
         random_play(game, &mut self.move_buf, rng)
     }
 
@@ -67,11 +67,68 @@ where
 }
 
 /// Obtain an initial bias by playing random moves and reporting the outcome.
-pub struct UcbSolver<G: TwoPlayerGame> {
+pub struct UcbSolver<B> {
+    bias: B,
+}
+
+impl<B> UcbSolver<B> {
+    pub fn new() -> Self
+    where
+        B: Default,
+    {
+        Self { bias: B::default() }
+    }
+
+    pub fn with_bias(bias: B) -> Self {
+        Self { bias }
+    }
+}
+
+impl<B> Default for UcbSolver<B>
+where
+    B: Default,
+{
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<G, B> Policy<G> for UcbSolver<B>
+where
+    B: CountWdlSolvedBias<G>,
+    G: TwoPlayerGame,
+{
+    type Evaluation = CountWdlSolved;
+
+    fn bias(&mut self, game: G, rng: &mut impl Rng) -> CountWdlSolved {
+        self.bias.bias(game, rng)
+    }
+
+    fn unexplored_bias(&self) -> CountWdlSolved {
+        CountWdlSolved::default()
+    }
+
+    fn reevaluate(&mut self, _game: G, _previous_evaluation: CountWdlSolved) -> CountWdlSolved {
+        unreachable!("Solver should never visit the same leaf twice")
+    }
+}
+
+pub trait CountWdlBias<G> {
+    fn bias(&mut self, game: G, rng: &mut impl Rng) -> CountWdl;
+}
+
+pub trait CountWdlSolvedBias<G> {
+    fn bias(&mut self, game: G, rng: &mut impl Rng) -> CountWdlSolved;
+}
+
+pub struct RandomPlayout<G: TwoPlayerGame> {
     move_buf: Vec<G::Move>,
 }
 
-impl<G: TwoPlayerGame> UcbSolver<G> {
+impl<G> RandomPlayout<G>
+where
+    G: TwoPlayerGame,
+{
     pub fn new() -> Self {
         Self {
             move_buf: Vec::new(),
@@ -79,28 +136,30 @@ impl<G: TwoPlayerGame> UcbSolver<G> {
     }
 }
 
-impl<G: TwoPlayerGame> Default for UcbSolver<G> {
+impl<G> Default for RandomPlayout<G>
+where
+    G: TwoPlayerGame,
+{
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<G> Policy<G> for UcbSolver<G>
+impl<G> CountWdlBias<G> for RandomPlayout<G>
 where
     G: TwoPlayerGame,
 {
-    type Evaluation = CountWdlSolved;
+    fn bias(&mut self, game: G, rng: &mut impl Rng) -> CountWdl {
+        random_play(game, &mut self.move_buf, rng)
+    }
+}
 
-    fn initial_evaluation(&mut self, game: G, rng: &mut impl Rng) -> CountWdlSolved {
+impl<G> CountWdlSolvedBias<G> for RandomPlayout<G>
+where
+    G: TwoPlayerGame,
+{
+    fn bias(&mut self, game: G, rng: &mut impl Rng) -> CountWdlSolved {
         CountWdlSolved::Undecided(random_play(game, &mut self.move_buf, rng))
-    }
-
-    fn unexplored_bias(&self) -> CountWdlSolved {
-        CountWdlSolved::Undecided(CountWdl::default())
-    }
-
-    fn reevaluate(&mut self, _game: G, _previous_evaluation: CountWdlSolved) -> CountWdlSolved {
-        unreachable!("Solver should never visit the same leaf twice")
     }
 }
 

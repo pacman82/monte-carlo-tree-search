@@ -2,7 +2,7 @@ use std::cmp::Ordering;
 
 use crate::{GameState, Player};
 
-use super::{Evaluation, CountWdl};
+use super::{CountWdl, Evaluation};
 
 /// Use an Upper Confidence Bound to select the next node to expand. In addition to the use of the
 /// "classic" upper confidence bound, this evaluation also features variants for states such as
@@ -253,7 +253,7 @@ pub struct CountOrDecidedDelta {
 mod test {
     use std::cmp::Ordering;
 
-    use crate::{Evaluation as _, Player, CountWdl, CountWdlSolved};
+    use crate::{CountWdl, CountWdlSolved, Evaluation as _, Player};
 
     #[test]
     fn compare_evaluations() {
