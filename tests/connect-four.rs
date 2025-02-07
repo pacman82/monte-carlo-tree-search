@@ -6,7 +6,7 @@ use std::{
 
 use connect_four_solver::{Column, Solver};
 use monte_carlo_tree_search::{
-    CountWdl, CountWdlSolved, CountWdlSolvedBias, GameState, Player, Policy, RandomPlayout, Tree,
+    CountWdl, CountWdlSolved, CountWdlSolvedBias, GameState, Player, Policy, RandomPlayout, Search,
     TwoPlayerGame, UcbSolver,
 };
 use rand::{rngs::StdRng, seq::IndexedRandom as _, Rng, SeedableRng};
@@ -17,7 +17,7 @@ fn play_move_connect_four() {
     let game = ConnectFour::new();
     let num_playouts = 100;
 
-    let tree = Tree::with_playouts(
+    let tree = Search::with_playouts(
         game,
         UcbSolver::<RandomPlayout<_>>::new(),
         num_playouts,
@@ -33,7 +33,7 @@ fn play_move_connect_four() {
 fn start_from_terminal_position() {
     // First player has won
     let game = ConnectFour::from_move_list("1212121");
-    let tree = Tree::new(game, UcbSolver::<RandomPlayout<_>>::new());
+    let tree = Search::new(game, UcbSolver::<RandomPlayout<_>>::new());
 
     assert_eq!(CountWdlSolved::Win(Player::One), tree.evaluation());
 }
@@ -55,7 +55,7 @@ fn position_424424455557722225141717() {
 
     let mut rng = StdRng::seed_from_u64(42);
     let num_playouts = 1_000;
-    let tree = Tree::with_playouts(
+    let tree = Search::with_playouts(
         game,
         UcbSolver::<RandomPlayout<_>>::new(),
         num_playouts,
@@ -83,7 +83,7 @@ fn position_42442445555772222514171() {
 
     let mut rng = StdRng::seed_from_u64(42);
     let num_playouts = 1000;
-    let tree = Tree::with_playouts(
+    let tree = Search::with_playouts(
         game,
         UcbSolver::<RandomPlayout<_>>::new(),
         num_playouts,
@@ -109,7 +109,7 @@ fn beat_perfect_solver_as_player_one() {
         let next_move = match game.current_player() {
             Player::One => {
                 let num_playouts = 20_000;
-                let tree = Tree::with_playouts(
+                let tree = Search::with_playouts(
                     game,
                     UcbSolver::<ConnectFourBias>::new(),
                     num_playouts,
@@ -171,7 +171,7 @@ fn solve_connect_four() {
     let game = ConnectFour::new();
     let num_playouts = 1_000;
 
-    let tree = Tree::with_playouts(
+    let tree = Search::with_playouts(
         game,
         UcbSolver::with_bias(PerfectBias::new()),
         num_playouts,
@@ -181,7 +181,7 @@ fn solve_connect_four() {
     assert_eq!(CountWdlSolved::Win(Player::One), tree.evaluation());
 }
 
-fn print_move_statistics<B>(tree: &Tree<ConnectFour, B>)
+fn print_move_statistics<B>(tree: &Search<ConnectFour, B>)
 where
     B: Policy<ConnectFour, Evaluation = CountWdlSolved>,
 {
@@ -359,7 +359,7 @@ fn use_tree_to_generate_move<B>(
 where
     B: CountWdlSolvedBias<ConnectFour>,
 {
-    let tree = Tree::with_playouts(
+    let tree = Search::with_playouts(
         ConnectFour(game),
         UcbSolver::with_bias(bias),
         num_playouts,
