@@ -8,6 +8,20 @@ pub struct Tree<N, L> {
     pub links: Vec<Link<L>>,
 }
 
+impl<N, L> Tree<N, L> {
+
+    /// Links to the children of the node
+    pub fn child_links(&self, node_index: usize) -> impl ExactSizeIterator<Item = Link<L>> + '_
+    where
+        L: Copy,
+    {
+        let node = &self.nodes[node_index];
+        self.links[node.children_begin..node.children_end]
+            .iter()
+            .copied()
+    }
+}
+
 #[derive(Debug)]
 pub struct Node<E> {
     /// Index of the parent node. The root node will be set to `usize::MAX`.

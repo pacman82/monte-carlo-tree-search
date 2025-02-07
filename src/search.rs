@@ -2,7 +2,10 @@ use std::cmp::Ordering;
 
 use rand::{seq::IndexedRandom as _, Rng};
 
-use crate::{Evaluation, Player, Policy, TwoPlayerGame, tree::{Link, Node, Tree}};
+use crate::{
+    tree::{Link, Node, Tree},
+    Evaluation, Player, Policy, TwoPlayerGame,
+};
 
 /// A tree there the nodes represent game states and the links represent moves. The tree does only
 /// store the root game state and reconstruct the nodes based on the moves. It does store an
@@ -129,9 +132,7 @@ where
     }
 
     pub fn eval_by_move(&self) -> impl Iterator<Item = (G::Move, P::Evaluation)> + '_ {
-        let root = &self.tree.nodes[0];
-        self.tree.links[root.children_begin..root.children_end]
-            .iter()
+        self.tree.child_links(0)
             .map(move |link| {
                 if link.is_explored() {
                     let child = &self.tree.nodes[link.child];
@@ -156,6 +157,7 @@ where
         let mut game = self.game.clone();
         while !self.has_unexplored_children(current_node_index) {
             let Some(best_ucb) = self
+                .tree
                 .child_links(current_node_index)
                 // Filter all solved positions. We may assume link is explored, because of the
                 // entry condition of the while loop
@@ -207,10 +209,12 @@ where
         let grandchildren_begin = self.tree.links.len();
         let grandchildren_end = grandchildren_begin + new_node_game_state.moves().len();
         let eval = P::Evaluation::init_from_game_state(&new_node_game_state);
-        self.tree.links.extend(self.move_buf.drain(..).map(|move_| Link {
-            child: usize::MAX,
-            move_,
-        }));
+        self.tree
+            .links
+            .extend(self.move_buf.drain(..).map(|move_| Link {
+                child: usize::MAX,
+                move_,
+            }));
 
         self.tree.nodes.push(Node::new(
             to_be_expanded_index,
@@ -254,7 +258,7 @@ where
         parent_index: usize,
         child_index: usize,
     ) -> impl Iterator<Item = Option<P::Evaluation>> + '_ {
-        self.child_links(parent_index).filter_map(move |link| {
+        self.tree.child_links(parent_index).filter_map(move |link| {
             if link.is_explored() {
                 if link.child == child_index {
                     None
@@ -311,15 +315,8 @@ where
 
     /// `true` if the node has at least one child which is not explored yet.
     fn has_unexplored_children(&self, node_index: usize) -> bool {
-        let mut it = self.child_links(node_index);
+        let mut it = self.tree.child_links(node_index);
         it.any(|link| !link.is_explored())
-    }
-
-    fn child_links(&self, node_index: usize) -> impl ExactSizeIterator<Item = Link<G::Move>> + '_ {
-        let node = &self.tree.nodes[node_index];
-        self.tree.links[node.children_begin..node.children_end]
-            .iter()
-            .copied()
     }
 }
 
