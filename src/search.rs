@@ -41,19 +41,10 @@ where
     pub fn new(game: G, policy: P) -> Self {
         let mut move_buf = Vec::new();
         let estimated_outcome = P::Evaluation::init_from_game_state(&game.state(&mut move_buf));
-        let root = Node::new(usize::MAX, 0, move_buf.len(), estimated_outcome);
-        let nodes = vec![root];
-        let links: Vec<_> = move_buf
-            .drain(..)
-            .map(|move_| Link {
-                child: usize::MAX,
-                move_,
-            })
-            .collect();
+        let tree = Tree::new(estimated_outcome, move_buf.drain(..));
         // Choose the first move as the best move to start, only so, that if [`Self::best_move`] is
         // called, before the first playout, it will return a move and not `None`.
-        let best_link = if links.is_empty() { None } else { Some(0) };
-        let tree = Tree { nodes, links };
+        let best_link = if tree.links.is_empty() { None } else { Some(0) };
         Self {
             game,
             tree,

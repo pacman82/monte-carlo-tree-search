@@ -1,3 +1,6 @@
+/// A tree data structure. Its nodes can have arbitrary numbers of children. At the moment a node is
+/// added the number of its potential children must be known. The nodes these links are pointing to
+/// can be added later though. We call this "expansion".
 pub struct Tree<N, L> {
     /// We store all the nodes of the tree in a vector to avoid allocations. We refer to the nodes
     /// using indices.
@@ -9,6 +12,20 @@ pub struct Tree<N, L> {
 }
 
 impl<N, L> Tree<N, L> {
+    /// Creates a new tree with a root node.
+    pub fn new(initial_root_payload: N, links: impl Iterator<Item = L>) -> Self {
+        let links: Vec<_> = links
+            .map(|move_| Link {
+                child: usize::MAX,
+                move_,
+            })
+            .collect();
+        let root = Node::new(usize::MAX, 0, links.len(), initial_root_payload);
+        Self {
+            nodes: vec![root],
+            links,
+        }
+    }
 
     /// Links to the children of the node
     pub fn child_links(&self, node_index: usize) -> impl ExactSizeIterator<Item = Link<L>> + '_
