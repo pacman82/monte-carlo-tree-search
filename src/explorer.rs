@@ -20,7 +20,7 @@ pub trait Explorer<G: TwoPlayerGame> {
     fn unexplored_bias(&self) -> Self::Evaluation;
 
     /// Invoked then selection yields a node that has been visited before.
-    fn reevaluate(&mut self, game: G, previous_evaluation: Self::Evaluation) -> Self::Evaluation;
+    fn reevaluate(&mut self, game: G, evaluation: &mut Self::Evaluation) -> Self::Delta;
 
     /// Called during backpropagation. Updates the evaluation of a node based on a propagated delta
     /// emitted by the update of a child node. In addition to that, we can also take the evaluations
@@ -79,13 +79,15 @@ where
         CountWdl::default()
     }
 
-    fn reevaluate(&mut self, _game: G, previous_evaluation: CountWdl) -> Self::Evaluation {
-        let increment_existing = |i| if i == 0 { 0 } else { i + 1 };
-        CountWdl {
-            wins_player_one: increment_existing(previous_evaluation.wins_player_one),
-            wins_player_two: increment_existing(previous_evaluation.wins_player_two),
-            draws: increment_existing(previous_evaluation.draws),
-        }
+    fn reevaluate(&mut self, _game: G, evaluation: &mut CountWdl) -> CountWdl {
+        let zero_or_one = |i| if i == 0 { 0 } else { 1 };
+        let delta = CountWdl {
+            wins_player_one: zero_or_one(evaluation.wins_player_one),
+            wins_player_two: zero_or_one(evaluation.wins_player_two),
+            draws: zero_or_one(evaluation.draws),
+        };
+        *evaluation += delta;
+        delta
     }
 
     fn update(
@@ -148,7 +150,7 @@ where
         CountWdlSolved::default()
     }
 
-    fn reevaluate(&mut self, _game: G, _previous_evaluation: CountWdlSolved) -> CountWdlSolved {
+    fn reevaluate(&mut self, _game: G, _evaluation: &mut CountWdlSolved) -> CountWdlSolvedDelta {
         unreachable!("Solver should never visit the same leaf twice")
     }
 

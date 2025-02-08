@@ -67,7 +67,7 @@ fn position_424424455557722225141717() {
 
 /// `O` needs to play `1` in order to prevent `X` from winning via `1`. However, no matter what `O`
 /// plays, `X` will win. This test verifies it still plays `1`, even though all outcomes are the
-/// same considering we only solve the game weekly.
+/// same considering we only solved the game weakly.
 #[test]
 fn position_42442445555772222514171() {
     let game = ConnectFour::from_move_list("42442445555772222514171");

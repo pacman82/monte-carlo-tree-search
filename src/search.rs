@@ -73,21 +73,25 @@ where
         }
 
         let Selection {
-            node_index: to_be_expanded_index,
+            node_index,
             board: mut game,
             has_unexplored_children,
         } = self.select_unexplored_node();
 
         if !has_unexplored_children {
             // Existing node
-            self.tree.nodes[to_be_expanded_index].evaluation = self
+            let player = game.current_player();
+            let delta = self
                 .policy
-                .reevaluate(game, self.tree.nodes[to_be_expanded_index].evaluation);
-            return false;
+                .reevaluate(game, &mut self.tree.evaluation_mut(node_index));
+            // Player whom gets to choose the next turn in the board the (new) leaf node represents.
+            self.backpropagation(node_index, delta, player);
+            self.update_best_link();
+            return true;
         }
 
         // Create a new child node for the selected node and let `game` represent its state
-        let new_node_index = self.expand(to_be_expanded_index, &mut game, rng);
+        let new_node_index = self.expand(node_index, &mut game, rng);
 
         // Player whom gets to choose the next turn in the board the (new) leaf node represents.
         let player = game.current_player();
@@ -101,6 +105,7 @@ where
         let delta = self
             .policy
             .initial_delta(&self.tree.nodes[new_node_index].evaluation);
+        
         self.backpropagation(new_node_index, delta, player);
         self.update_best_link();
         true

@@ -1,6 +1,6 @@
 mod evaluation;
 mod player;
-mod policy;
+mod explorer;
 mod search;
 mod tree;
 mod two_player_game;
@@ -8,7 +8,7 @@ mod two_player_game;
 pub use self::{
     evaluation::{CountWdl, CountWdlSolved, CountWdlSolvedDelta, Evaluation},
     player::Player,
-    policy::{
+    explorer::{
         random_play, CountWdlBias, CountWdlSolvedBias, Explorer, RandomPlayout, Ucb, UcbSolver,
     },
     search::Search,
