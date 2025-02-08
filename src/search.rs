@@ -78,35 +78,32 @@ where
             has_unexplored_children,
         } = self.select_unexplored_node();
 
-        if !has_unexplored_children {
+        let (player, node_index, delta) = if !has_unexplored_children {
             // Existing node
             let player = game.current_player();
             let delta = self
                 .policy
                 .reevaluate(game, &mut self.tree.evaluation_mut(node_index));
+            (player, node_index, delta)
+        } else {
+            // Create a new child node for the selected node and let `game` represent its state
+            let new_node_index = self.expand(node_index, &mut game, rng);
+
             // Player whom gets to choose the next turn in the board the (new) leaf node represents.
-            self.backpropagation(node_index, delta, player);
-            self.update_best_link();
-            return true;
-        }
+            let player = game.current_player();
 
-        // Create a new child node for the selected node and let `game` represent its state
-        let new_node_index = self.expand(node_index, &mut game, rng);
+            // If the game is not in a terminal state, start a simulation to gain an initial estimate
+            if !self.tree.evaluation(new_node_index).is_solved() {
+                let bias = self.policy.bias(game, rng);
+                *self.tree.evaluation_mut(new_node_index) = bias;
+            }
+            let delta = self
+                .policy
+                .initial_delta(&self.tree.nodes[new_node_index].evaluation);
+            (player, new_node_index, delta)
+        };
 
-        // Player whom gets to choose the next turn in the board the (new) leaf node represents.
-        let player = game.current_player();
-
-        // If the game is not in a terminal state, start a simulation to gain an initial estimate
-        if !self.tree.evaluation(new_node_index).is_solved() {
-            let bias = self.policy.bias(game, rng);
-            *self.tree.evaluation_mut(new_node_index) = bias;
-        }
-
-        let delta = self
-            .policy
-            .initial_delta(&self.tree.nodes[new_node_index].evaluation);
-        
-        self.backpropagation(new_node_index, delta, player);
+        self.backpropagation(node_index, delta, player);
         self.update_best_link();
         true
     }
