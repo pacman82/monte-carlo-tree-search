@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0](https://github.com/pacman82/monte-carlo-tree-search/compare/v0.2.0...v0.3.0) - 2025-02-08
+
+### Other
+
+- pass delta explicitly to backpropagation
+- [**breaking**] Rename trait Policy -> Exploror
+- [**breaking**] Move update to policy
+- Introduce Tree::child_move_and_eval
+- Introduce tree::new
+- move child_links to Tree
+- [**breaking**] Rename Tree -> Search
+
 ## [0.2.0](https://github.com/pacman82/monte-carlo-tree-search/compare/v0.1.1...v0.2.0) - 2025-02-06
 
 ### Added
