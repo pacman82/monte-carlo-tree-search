@@ -9,7 +9,7 @@ pub use self::{
     evaluation::{CountWdlSolvedDelta, CountWdl, CountWdlSolved, Evaluation},
     player::Player,
     policy::{
-        random_play, CountWdlBias, CountWdlSolvedBias, Policy, RandomPlayout, Ucb, UcbSolver,
+        random_play, CountWdlBias, CountWdlSolvedBias, Explorer, RandomPlayout, Ucb, UcbSolver,
     },
     search::Search,
     two_player_game::{GameState, TwoPlayerGame},

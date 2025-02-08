@@ -1,7 +1,7 @@
 use std::ops::{Deref, DerefMut};
 
 use monte_carlo_tree_search::{
-    CountWdlSolved, GameState, Player, Policy, RandomPlayout, Search, TwoPlayerGame, Ucb, UcbSolver,
+    CountWdlSolved, GameState, Player, Explorer, RandomPlayout, Search, TwoPlayerGame, Ucb, UcbSolver,
 };
 use rand::{rngs::StdRng, SeedableRng as _};
 use tic_tac_toe_board::{CellIndex, TicTacToeState};
@@ -153,7 +153,7 @@ fn prevent_immediate_win_of_player_one() {
 
 fn print_move_statistics<B>(tree: &Search<TicTacToe, B>)
 where
-    B: Policy<TicTacToe, Evaluation = CountWdlSolved>,
+    B: Explorer<TicTacToe, Evaluation = CountWdlSolved>,
 {
     let evals = tree.eval_by_move().collect::<Vec<_>>();
     for (mv, eval) in evals {

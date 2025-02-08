@@ -4,13 +4,13 @@ use rand::{seq::IndexedRandom as _, Rng};
 
 use crate::{
     tree::{Link, Node, Tree, ROOT_INDEX},
-    Evaluation, Player, Policy, TwoPlayerGame,
+    Evaluation, Player, Explorer, TwoPlayerGame,
 };
 
 /// A tree there the nodes represent game states and the links represent moves. The tree does only
 /// store the root game state and reconstruct the nodes based on the moves. It does store an
 /// evaluation for each node though. The evaluation is updated during each playout.
-pub struct Search<G: TwoPlayerGame, P: Policy<G>> {
+pub struct Search<G: TwoPlayerGame, P: Explorer<G>> {
     /// Game state of the root node.
     game: G,
     tree: Tree<P::Evaluation, G::Move>,
@@ -36,7 +36,7 @@ pub struct Search<G: TwoPlayerGame, P: Policy<G>> {
 impl<G, P> Search<G, P>
 where
     G: TwoPlayerGame,
-    P: Policy<G>,
+    P: Explorer<G>,
 {
     pub fn new(game: G, policy: P) -> Self {
         let mut move_buf = Vec::new();

@@ -6,7 +6,7 @@ use std::{
 
 use connect_four_solver::{Column, Solver};
 use monte_carlo_tree_search::{
-    CountWdl, CountWdlSolved, CountWdlSolvedBias, GameState, Player, Policy, RandomPlayout, Search,
+    CountWdl, CountWdlSolved, CountWdlSolvedBias, GameState, Player, Explorer, RandomPlayout, Search,
     TwoPlayerGame, UcbSolver,
 };
 use rand::{rngs::StdRng, seq::IndexedRandom as _, Rng, SeedableRng};
@@ -183,7 +183,7 @@ fn solve_connect_four() {
 
 fn print_move_statistics<B>(tree: &Search<ConnectFour, B>)
 where
-    B: Policy<ConnectFour, Evaluation = CountWdlSolved>,
+    B: Explorer<ConnectFour, Evaluation = CountWdlSolved>,
 {
     let evals = tree.eval_by_move().collect::<Vec<_>>();
     for (mv, eval) in evals {

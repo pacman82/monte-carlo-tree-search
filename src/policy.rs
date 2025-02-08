@@ -3,7 +3,7 @@ use rand::{seq::IndexedRandom as _, Rng};
 use crate::{CountWdl, CountWdlSolved, CountWdlSolvedDelta, Evaluation, GameState, Player, TwoPlayerGame};
 
 /// Control selection, evaluation and backpropagation.
-pub trait Policy<G: TwoPlayerGame> {
+pub trait Explorer<G: TwoPlayerGame> {
     /// The type of evaluation returned by the bias.
     type Evaluation: Evaluation;
 
@@ -61,7 +61,7 @@ where
     }
 }
 
-impl<G> Policy<G> for Ucb<G>
+impl<G> Explorer<G> for Ucb<G>
 where
     G: TwoPlayerGame,
 {
@@ -129,7 +129,7 @@ where
     }
 }
 
-impl<G, B> Policy<G> for UcbSolver<B>
+impl<G, B> Explorer<G> for UcbSolver<B>
 where
     B: CountWdlSolvedBias<G>,
     G: TwoPlayerGame,
