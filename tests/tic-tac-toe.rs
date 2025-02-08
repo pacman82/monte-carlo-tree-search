@@ -1,7 +1,8 @@
 use std::ops::{Deref, DerefMut};
 
 use monte_carlo_tree_search::{
-    CountWdlSolved, GameState, Player, Explorer, RandomPlayout, Search, TwoPlayerGame, Ucb, UcbSolver,
+    CountWdlSolved, Explorer, GameState, Player, RandomPlayout, Search, TwoPlayerGame, Ucb,
+    UcbSolver,
 };
 use rand::{rngs::StdRng, SeedableRng as _};
 use tic_tac_toe_board::{CellIndex, TicTacToeState};

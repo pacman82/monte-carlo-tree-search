@@ -13,7 +13,10 @@ pub struct Tree<N, L> {
     pub links: Vec<Link<L>>,
 }
 
-impl<N, L> Tree<N, L> where L: Copy{
+impl<N, L> Tree<N, L>
+where
+    L: Copy,
+{
     /// Creates a new tree with a root node.
     pub fn new(initial_root_payload: N, links: impl Iterator<Item = L>) -> Self {
         let links: Vec<_> = links
@@ -30,8 +33,7 @@ impl<N, L> Tree<N, L> where L: Copy{
     }
 
     /// Links to the children of the node
-    pub fn child_links(&self, node_index: usize) -> impl ExactSizeIterator<Item = Link<L>> + '_
-    {
+    pub fn child_links(&self, node_index: usize) -> impl ExactSizeIterator<Item = Link<L>> + '_ {
         let node = &self.nodes[node_index];
         self.links[node.children_begin..node.children_end]
             .iter()

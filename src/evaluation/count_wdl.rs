@@ -71,7 +71,6 @@ impl SubAssign for CountWdl {
 }
 
 impl Evaluation for CountWdl {
-
     fn cmp_for(&self, other: &Self, player: Player) -> Ordering {
         self.reward(player)
             .partial_cmp(&other.reward(player))

@@ -4,7 +4,7 @@ use rand::{seq::IndexedRandom as _, Rng};
 
 use crate::{
     tree::{Link, Node, Tree, ROOT_INDEX},
-    Evaluation, Player, Explorer, TwoPlayerGame,
+    Evaluation, Explorer, Player, TwoPlayerGame,
 };
 
 /// A tree there the nodes represent game states and the links represent moves. The tree does only
@@ -98,7 +98,10 @@ where
             *self.tree.evaluation_mut(new_node_index) = bias;
         }
 
-        self.backpropagation(new_node_index, player);
+        let delta = self
+            .policy
+            .initial_delta(&self.tree.nodes[new_node_index].evaluation);
+        self.backpropagation(new_node_index, delta, player);
         self.update_best_link();
         true
     }
@@ -219,10 +222,7 @@ where
         new_node_index
     }
 
-    fn backpropagation(&mut self, node_index: usize, mut player: Player) {
-        let mut delta = self
-            .policy
-            .initial_delta(&self.tree.nodes[node_index].evaluation);
+    fn backpropagation(&mut self, node_index: usize, mut delta: P::Delta, mut player: Player) {
         let mut current_child_index = node_index;
         let mut maybe_current_index = self.tree.nodes[node_index].parent_index();
         while let Some(current_node_index) = maybe_current_index {

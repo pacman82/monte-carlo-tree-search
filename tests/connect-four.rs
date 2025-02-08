@@ -6,8 +6,8 @@ use std::{
 
 use connect_four_solver::{Column, Solver};
 use monte_carlo_tree_search::{
-    CountWdl, CountWdlSolved, CountWdlSolvedBias, GameState, Player, Explorer, RandomPlayout, Search,
-    TwoPlayerGame, UcbSolver,
+    CountWdl, CountWdlSolved, CountWdlSolvedBias, Explorer, GameState, Player, RandomPlayout,
+    Search, TwoPlayerGame, UcbSolver,
 };
 use rand::{rngs::StdRng, seq::IndexedRandom as _, Rng, SeedableRng};
 

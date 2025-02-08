@@ -7,7 +7,7 @@ use crate::{GameState, Player};
 
 pub use self::{
     count_wdl::CountWdl,
-    count_wdl_solved::{CountWdlSolvedDelta, CountWdlSolved},
+    count_wdl_solved::{CountWdlSolved, CountWdlSolvedDelta},
 };
 
 /// Controls what information is stored for each board remembered in the nodes of the tree, how

@@ -1,6 +1,8 @@
 use rand::{seq::IndexedRandom as _, Rng};
 
-use crate::{CountWdl, CountWdlSolved, CountWdlSolvedDelta, Evaluation, GameState, Player, TwoPlayerGame};
+use crate::{
+    CountWdl, CountWdlSolved, CountWdlSolvedDelta, Evaluation, GameState, Player, TwoPlayerGame,
+};
 
 /// Control selection, evaluation and backpropagation.
 pub trait Explorer<G: TwoPlayerGame> {

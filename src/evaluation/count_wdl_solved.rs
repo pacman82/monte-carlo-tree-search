@@ -51,7 +51,6 @@ impl CountWdlSolved {
 }
 
 impl Evaluation for CountWdlSolved {
-
     fn cmp_for(&self, other: &CountWdlSolved, player: Player) -> Ordering {
         match (self, other) {
             (CountWdlSolved::Win(p1), CountWdlSolved::Win(p2)) => {
