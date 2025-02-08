@@ -3,7 +3,7 @@ use std::cmp::Ordering;
 use rand::{seq::IndexedRandom as _, Rng};
 
 use crate::{
-    tree::{Link, Node, Tree},
+    tree::{Link, Node, Tree, ROOT_INDEX},
     Evaluation, Player, Policy, TwoPlayerGame,
 };
 
@@ -68,7 +68,7 @@ where
     /// Playout one cycle of selection, expansion, simulation and backpropagation. `true` if the
     /// playout may have changed the evaluation of the root, `false` if the game is already solved.
     pub fn playout(&mut self, rng: &mut impl Rng) -> bool {
-        if self.tree.nodes[0].evaluation.is_solved() {
+        if self.tree.evaluation(ROOT_INDEX).is_solved() {
             return false;
         }
 
@@ -89,9 +89,9 @@ where
         let player = game.current_player();
 
         // If the game is not in a terminal state, start a simulation to gain an initial estimate
-        if !self.tree.nodes[new_node_index].evaluation.is_solved() {
+        if !self.tree.evaluation(new_node_index).is_solved() {
             let bias = self.policy.bias(game, rng);
-            self.tree.nodes[new_node_index].evaluation = bias;
+            *self.tree.evaluation_mut(new_node_index) = bias;
         }
 
         self.backpropagation(new_node_index, player);
@@ -106,11 +106,11 @@ where
     }
 
     pub fn num_nodes(&self) -> usize {
-        self.tree.nodes.len()
+        self.tree.num_nodes()
     }
 
     pub fn num_links(&self) -> usize {
-        self.tree.links.len()
+        self.tree.num_links()
     }
 
     pub fn game(&self) -> &G {
@@ -119,18 +119,17 @@ where
 
     /// Count of playouts of the root node.
     pub fn evaluation(&self) -> P::Evaluation {
-        self.tree.nodes[0].evaluation
+        *self.tree.evaluation(ROOT_INDEX)
     }
 
-    pub fn eval_by_move(&self) -> impl Iterator<Item = (G::Move, P::Evaluation)> + '_ {
-        self.tree.child_links(0)
-            .map(move |link| {
-                if link.is_explored() {
-                    let child = &self.tree.nodes[link.child];
-                    (link.move_, child.evaluation)
-                } else {
-                    (link.move_, self.policy.unexplored_bias())
-                }
+    pub fn eval_by_move(&self) -> impl ExactSizeIterator<Item = (G::Move, P::Evaluation)> + '_ {
+        self.tree
+            .child_move_and_eval(ROOT_INDEX)
+            .map(|(move_, maybe_eval)| {
+                (
+                    move_,
+                    maybe_eval.copied().unwrap_or(self.policy.unexplored_bias()),
+                )
             })
     }
 

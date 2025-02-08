@@ -1,3 +1,5 @@
+pub const ROOT_INDEX: usize = 0;
+
 /// A tree data structure. Its nodes can have arbitrary numbers of children. At the moment a node is
 /// added the number of its potential children must be known. The nodes these links are pointing to
 /// can be added later though. We call this "expansion".
@@ -36,6 +38,42 @@ impl<N, L> Tree<N, L> {
         self.links[node.children_begin..node.children_end]
             .iter()
             .copied()
+    }
+
+    /// The move which would lead to the child node. In case the child node is already existing we
+    /// also get the evalutation, or `None` otherwise.
+    pub fn child_move_and_eval(
+        &self,
+        node_index: usize,
+    ) -> impl ExactSizeIterator<Item = (L, Option<&N>)> + '_
+    where
+        L: Copy,
+    {
+        self.child_links(node_index).map(|link| {
+            if link.is_explored() {
+                (link.move_, Some(&self.nodes[link.child].evaluation))
+            } else {
+                (link.move_, None)
+            }
+        })
+    }
+
+    /// Evaluation of the node identified by `node_index`.
+    pub fn evaluation(&self, node_index: usize) -> &N {
+        &self.nodes[node_index].evaluation
+    }
+
+    /// Evaluation of the node identified by `node_index`.
+    pub fn evaluation_mut(&mut self, node_index: usize) -> &mut N {
+        &mut self.nodes[node_index].evaluation
+    }
+
+    pub fn num_nodes(&self) -> usize {
+        self.nodes.len()
+    }
+
+    pub fn num_links(&self) -> usize {
+        self.links.len()
     }
 }
 
