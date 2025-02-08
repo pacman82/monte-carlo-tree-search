@@ -6,7 +6,7 @@ mod tree;
 mod two_player_game;
 
 pub use self::{
-    evaluation::{CountOrDecidedDelta, CountWdl, CountWdlSolved, Evaluation},
+    evaluation::{CountWdlSolvedDelta, CountWdl, CountWdlSolved, Evaluation},
     player::Player,
     policy::{
         random_play, CountWdlBias, CountWdlSolvedBias, Policy, RandomPlayout, Ucb, UcbSolver,

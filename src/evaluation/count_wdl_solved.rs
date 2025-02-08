@@ -51,7 +51,6 @@ impl CountWdlSolved {
 }
 
 impl Evaluation for CountWdlSolved {
-    type Delta = CountOrDecidedDelta;
 
     fn cmp_for(&self, other: &CountWdlSolved, player: Player) -> Ordering {
         match (self, other) {
@@ -104,121 +103,10 @@ impl Evaluation for CountWdlSolved {
         }
     }
 
-    /// Called during backpropagation. Updates the evaluation of a node based on a propagated delta
-    /// emitted by the update of a child node. In addition to that, we can also take the evaluations
-    /// of the siblings of the changed child into account. The method changes the evaluation of the
-    /// current node during propagation to its new value. In additon to that it emmits a delta which
-    /// in turn is passed to the update of its parent node.
-    fn update(
-        &mut self,
-        sibling_evaluations: impl Iterator<Item = Option<CountWdlSolved>>,
-        propagated_delta: CountOrDecidedDelta,
-        choosing_player: Player,
-    ) -> CountOrDecidedDelta {
-        let previous_count = self.into_count();
-        let CountOrDecidedDelta {
-            propagated_evaluation,
-            previous_count: previous_child_count,
-        } = propagated_delta;
-        if propagated_evaluation == CountWdlSolved::Win(choosing_player) {
-            // If it is the choosing players turn, she will choose a win
-            *self = propagated_evaluation;
-            return CountOrDecidedDelta {
-                propagated_evaluation,
-                previous_count,
-            };
-        }
-        // If the choosing player is not guaranteed to win let's check if there is a draw or a loss
-        let loss = CountWdlSolved::Win(choosing_player.opponent());
-        if propagated_evaluation.is_solved() {
-            let mut acc = Some(propagated_evaluation);
-            for maybe_eval in sibling_evaluations {
-                let Some(child_eval) = maybe_eval else {
-                    // Still has unexplored children, so we can not be sure the current node is a
-                    // draw or a loss.
-                    acc = None;
-                    break;
-                };
-                if child_eval == CountWdlSolved::Draw {
-                    // Found a draw, so we can be sure its not a loss
-                    acc = Some(CountWdlSolved::Draw);
-                } else if child_eval != loss {
-                    // Found a child neither draw or loss, so we can not rule out a victory yet
-                    acc = None;
-                    break;
-                }
-            }
-            if let Some(evaluation) = acc {
-                *self = evaluation;
-                return CountOrDecidedDelta {
-                    propagated_evaluation: evaluation,
-                    previous_count,
-                };
-            }
-        }
-        // No deterministic outcome, let's propagete the counts
-        let propageted_count = match propagated_evaluation {
-            CountWdlSolved::Win(Player::One) => {
-                let mut count = CountWdl {
-                    wins_player_one: previous_child_count.total() + propagated_evaluation.total(),
-                    ..Default::default()
-                };
-                count -= previous_child_count;
-                count
-            }
-            CountWdlSolved::Win(Player::Two) => {
-                let mut count = CountWdl {
-                    wins_player_two: previous_child_count.total() + propagated_evaluation.total(),
-                    ..Default::default()
-                };
-                count -= previous_child_count;
-                count
-            }
-            CountWdlSolved::Draw => {
-                let mut count = CountWdl {
-                    draws: previous_child_count.total() + propagated_evaluation.total(),
-                    ..Default::default()
-                };
-                count -= previous_child_count;
-                count
-            }
-            CountWdlSolved::Undecided(count) => count,
-        };
-
-        let (new_eval, delta) = match self {
-            CountWdlSolved::Undecided(mut count) => {
-                count += propageted_count;
-                (
-                    CountWdlSolved::Undecided(count),
-                    CountOrDecidedDelta {
-                        propagated_evaluation: CountWdlSolved::Undecided(propageted_count),
-                        previous_count,
-                    },
-                )
-            }
-            _ => (
-                *self,
-                CountOrDecidedDelta {
-                    propagated_evaluation: CountWdlSolved::Undecided(propageted_count),
-                    previous_count,
-                },
-            ),
-        };
-        *self = new_eval;
-        delta
-    }
-
     fn is_solved(&self) -> bool {
         match self {
             CountWdlSolved::Win(_) | CountWdlSolved::Draw => true,
             CountWdlSolved::Undecided(_) => false,
-        }
-    }
-
-    fn initial_delta(&self) -> Self::Delta {
-        CountOrDecidedDelta {
-            propagated_evaluation: *self,
-            previous_count: CountWdl::default(),
         }
     }
 
@@ -239,7 +127,7 @@ impl Default for CountWdlSolved {
 }
 
 /// Delta propagated upwards from child to parent during backpropagation.
-pub struct CountOrDecidedDelta {
+pub struct CountWdlSolvedDelta {
     /// Did the child change to a win for either player? Is it a draw? In case of undecided the
     /// count is **not** the count of the child, but the count of the change in the child.
     pub propagated_evaluation: CountWdlSolved,

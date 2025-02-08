@@ -13,7 +13,7 @@ pub struct Tree<N, L> {
     pub links: Vec<Link<L>>,
 }
 
-impl<N, L> Tree<N, L> {
+impl<N, L> Tree<N, L> where L: Copy{
     /// Creates a new tree with a root node.
     pub fn new(initial_root_payload: N, links: impl Iterator<Item = L>) -> Self {
         let links: Vec<_> = links
@@ -31,8 +31,6 @@ impl<N, L> Tree<N, L> {
 
     /// Links to the children of the node
     pub fn child_links(&self, node_index: usize) -> impl ExactSizeIterator<Item = Link<L>> + '_
-    where
-        L: Copy,
     {
         let node = &self.nodes[node_index];
         self.links[node.children_begin..node.children_end]
@@ -74,6 +72,32 @@ impl<N, L> Tree<N, L> {
 
     pub fn num_links(&self) -> usize {
         self.links.len()
+    }
+
+    /// All evaluations of the siblings of the given child node. If a sibling is not yet explored,
+    /// the evaluation will be `None`.
+    ///
+    /// # Parameters
+    ///
+    /// * `parent_index` - Parent of all the siblings and the child
+    /// * `child_index` - Index of the child node. Must be a child of the node pointed to by
+    ///   `parent_index`. The child will excluded from the items of the iterator.
+    pub fn sibling_evalutations(
+        &self,
+        parent_index: usize,
+        child_index: usize,
+    ) -> impl Iterator<Item = Option<&N>> + '_ {
+        self.child_links(parent_index).filter_map(move |link| {
+            if link.is_explored() {
+                if link.child == child_index {
+                    None
+                } else {
+                    Some(Some(&self.nodes[link.child].evaluation))
+                }
+            } else {
+                Some(None)
+            }
+        })
     }
 }
 

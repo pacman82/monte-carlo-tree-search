@@ -71,7 +71,6 @@ impl SubAssign for CountWdl {
 }
 
 impl Evaluation for CountWdl {
-    type Delta = CountWdl;
 
     fn cmp_for(&self, other: &Self, player: Player) -> Ordering {
         self.reward(player)
@@ -83,22 +82,8 @@ impl Evaluation for CountWdl {
         self.ucb(parent_eval.total() as f32, selecting_player)
     }
 
-    fn update(
-        &mut self,
-        _sibling_evaluations_: impl Iterator<Item = Option<Self>>,
-        propagated_delta: Self::Delta,
-        _choosing_player: Player,
-    ) -> Self::Delta {
-        *self += propagated_delta;
-        propagated_delta
-    }
-
     fn is_solved(&self) -> bool {
         false
-    }
-
-    fn initial_delta(&self) -> Self::Delta {
-        *self
     }
 
     fn init_from_game_state<M>(state: &GameState<'_, M>) -> Self {

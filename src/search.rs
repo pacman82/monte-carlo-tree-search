@@ -79,6 +79,10 @@ where
         } = self.select_unexplored_node();
 
         if !has_unexplored_children {
+            // Existing node
+            self.tree.nodes[to_be_expanded_index].evaluation = self
+                .policy
+                .reevaluate(game, self.tree.nodes[to_be_expanded_index].evaluation);
             return false;
         }
 
@@ -216,15 +220,20 @@ where
     }
 
     fn backpropagation(&mut self, node_index: usize, mut player: Player) {
-        let mut delta = self.tree.nodes[node_index].evaluation.initial_delta();
+        let mut delta = self
+            .policy
+            .initial_delta(&self.tree.nodes[node_index].evaluation);
         let mut current_child_index = node_index;
         let mut maybe_current_index = self.tree.nodes[node_index].parent_index();
         while let Some(current_node_index) = maybe_current_index {
             player.flip();
 
             let mut current_evaluation = self.tree.nodes[current_node_index].evaluation;
-            delta = current_evaluation.update(
-                self.sibling_evalutations(current_node_index, current_child_index),
+            delta = self.policy.update(
+                &mut current_evaluation,
+                self.tree
+                    .sibling_evalutations(current_node_index, current_child_index)
+                    .map(|e| e.copied()),
                 delta,
                 player,
             );
@@ -233,32 +242,6 @@ where
             node.evaluation = current_evaluation;
             maybe_current_index = node.parent_index();
         }
-    }
-
-    /// All evaluations of the siblings of the given child node. If a sibling is not yet explored,
-    /// the evaluation will be `None`.
-    ///
-    /// # Parameters
-    ///
-    /// * `parent_index` - Parent of all the siblings and the child
-    /// * `child_index` - Index of the child node. Must be a child of the node pointed to by
-    ///   `parent_index`. The child will excluded from the items of the iterator.
-    fn sibling_evalutations(
-        &self,
-        parent_index: usize,
-        child_index: usize,
-    ) -> impl Iterator<Item = Option<P::Evaluation>> + '_ {
-        self.tree.child_links(parent_index).filter_map(move |link| {
-            if link.is_explored() {
-                if link.child == child_index {
-                    None
-                } else {
-                    Some(Some(self.tree.nodes[link.child].evaluation))
-                }
-            } else {
-                Some(None)
-            }
-        })
     }
 
     fn update_best_link(&mut self) {
