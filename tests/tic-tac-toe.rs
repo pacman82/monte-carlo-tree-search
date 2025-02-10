@@ -45,6 +45,9 @@ fn play_tic_tac_toe_using_ucb() {
         // game.print_to(stderr()).unwrap();
         // eprintln!();
     }
+
+    let mut moves_buf = Vec::new();
+    assert_eq!(GameState::Draw, game.state(&mut moves_buf));
 }
 
 #[test]
