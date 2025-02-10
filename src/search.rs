@@ -92,7 +92,7 @@ where
             }
             let delta = self
                 .policy
-                .initial_delta(&self.tree.nodes[new_node_index].evaluation);
+                .initial_delta(&self.tree.evaluation(new_node_index));
             (player, new_node_index, delta)
         } else {
             // Existing node
@@ -160,15 +160,15 @@ where
                 .child_links(current_node_index)
                 // Filter all solved positions. We may assume link is explored, because of the
                 // entry condition of the while loop
-                .filter(|link| !self.tree.nodes[link.child].evaluation.is_solved())
+                .filter(|link| !self.tree.evaluation(link.child).is_solved())
                 .max_by(|a, b| {
                     let selecting_player = game.current_player();
-                    let a = self.tree.nodes[a.child].evaluation.selection_weight(
-                        &self.tree.nodes[current_node_index].evaluation,
+                    let a = self.tree.evaluation(a.child).selection_weight(
+                        &self.tree.evaluation(current_node_index),
                         selecting_player,
                     );
                     let b = self.tree.nodes[b.child].evaluation.selection_weight(
-                        &self.tree.nodes[current_node_index].evaluation,
+                        &self.tree.evaluation(current_node_index),
                         selecting_player,
                     );
                     a.partial_cmp(&b).unwrap()
