@@ -69,7 +69,12 @@ where
     }
 
     /// **Attention:** Currently this method does **not** update the child link of the parent node.
-    pub fn add(&mut self, parent_index: usize, payload: N, links: impl Iterator<Item = L>) -> usize {
+    pub fn add(
+        &mut self,
+        parent_index: usize,
+        payload: N,
+        links: impl Iterator<Item = L>,
+    ) -> usize {
         let children_begin = self.links.len();
         self.links.extend(links.map(|move_| Link {
             child: usize::MAX,

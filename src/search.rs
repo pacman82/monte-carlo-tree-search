@@ -92,14 +92,14 @@ where
             }
             let delta = self
                 .policy
-                .initial_delta(&self.tree.evaluation(new_node_index));
+                .initial_delta(self.tree.evaluation(new_node_index));
             (player, new_node_index, delta)
         } else {
             // Existing node
             let player = game.current_player();
             let delta = self
                 .policy
-                .reevaluate(game, &mut self.tree.evaluation_mut(node_index));
+                .reevaluate(game, self.tree.evaluation_mut(node_index));
             (player, node_index, delta)
         };
 
@@ -164,11 +164,11 @@ where
                 .max_by(|a, b| {
                     let selecting_player = game.current_player();
                     let a = self.tree.evaluation(a.child).selection_weight(
-                        &self.tree.evaluation(current_node_index),
+                        self.tree.evaluation(current_node_index),
                         selecting_player,
                     );
                     let b = self.tree.evaluation(b.child).selection_weight(
-                        &self.tree.evaluation(current_node_index),
+                        self.tree.evaluation(current_node_index),
                         selecting_player,
                     );
                     a.partial_cmp(&b).unwrap()
@@ -206,7 +206,9 @@ where
         let new_node_index = self.tree.nodes.len();
         let eval = P::Evaluation::init_from_game_state(&new_node_game_state);
         link.child = new_node_index;
-        let new_node_index = self.tree.add(to_be_expanded_index, eval, self.move_buf.drain(..));
+        let new_node_index = self
+            .tree
+            .add(to_be_expanded_index, eval, self.move_buf.drain(..));
         new_node_index
     }
 
