@@ -136,7 +136,7 @@ fn beat_perfect_solver_as_player_one() {
 #[test]
 #[ignore = "Computes a long time. More a design exploration, than an actual test"]
 fn play_against_yourself() {
-    let mut rng = StdRng::seed_from_u64(5);
+    let mut rng = StdRng::seed_from_u64(0);
     let mut game = connect_four_solver::ConnectFour::new();
 
     let mut history = Vec::new();
@@ -146,13 +146,13 @@ fn play_against_yourself() {
             // Player One
             eprintln!("Player One");
             let bias = ConnectFourBias::new();
-            let num_playouts = 100_000;
+            let num_playouts = 1_000_000;
             use_tree_to_generate_move(game, num_playouts, bias, &mut rng)
         } else {
             // Player Two
             eprintln!("Player Two");
-            let bias = RandomPlayout::new();
-            let num_playouts = 100_000;
+            let bias = ConnectFourBias::new();
+            let num_playouts = 1_000_000;
             use_tree_to_generate_move(game, num_playouts, bias, &mut rng)
         };
         eprintln!("column: {next_move}");

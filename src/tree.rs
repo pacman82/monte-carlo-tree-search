@@ -68,6 +68,20 @@ where
         &mut self.nodes[node_index].evaluation
     }
 
+    /// **Attention:** Currently this method does **not** update the child link of the parent node.
+    pub fn add(&mut self, parent_index: usize, payload: N, links: impl Iterator<Item = L>) -> usize {
+        let children_begin = self.links.len();
+        self.links.extend(links.map(|move_| Link {
+            child: usize::MAX,
+            move_,
+        }));
+        let children_end = self.links.len();
+        let node = Node::new(parent_index, children_begin, children_end, payload);
+        let node_index = self.nodes.len();
+        self.nodes.push(node);
+        node_index
+    }
+
     pub fn num_nodes(&self) -> usize {
         self.nodes.len()
     }
@@ -83,7 +97,7 @@ where
     ///
     /// * `parent_index` - Parent of all the siblings and the child
     /// * `child_index` - Index of the child node. Must be a child of the node pointed to by
-    ///   `parent_index`. The child will excluded from the items of the iterator.
+    /// * `parent_index`. The child will excluded from the items of the iterator.
     pub fn sibling_evalutations(
         &self,
         parent_index: usize,

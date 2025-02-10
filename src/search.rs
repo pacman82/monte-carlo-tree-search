@@ -3,7 +3,7 @@ use std::cmp::Ordering;
 use rand::{seq::IndexedRandom as _, Rng};
 
 use crate::{
-    tree::{Link, Node, Tree, ROOT_INDEX},
+    tree::{Tree, ROOT_INDEX},
     Evaluation, Explorer, Player, TwoPlayerGame,
 };
 
@@ -167,7 +167,7 @@ where
                         &self.tree.evaluation(current_node_index),
                         selecting_player,
                     );
-                    let b = self.tree.nodes[b.child].evaluation.selection_weight(
+                    let b = self.tree.evaluation(b.child).selection_weight(
                         &self.tree.evaluation(current_node_index),
                         selecting_player,
                     );
@@ -204,23 +204,9 @@ where
         let new_node_game_state = game.state(&mut self.move_buf);
         // Index there new node is created
         let new_node_index = self.tree.nodes.len();
-        link.child = new_node_index;
-        let grandchildren_begin = self.tree.links.len();
-        let grandchildren_end = grandchildren_begin + new_node_game_state.moves().len();
         let eval = P::Evaluation::init_from_game_state(&new_node_game_state);
-        self.tree
-            .links
-            .extend(self.move_buf.drain(..).map(|move_| Link {
-                child: usize::MAX,
-                move_,
-            }));
-
-        self.tree.nodes.push(Node::new(
-            to_be_expanded_index,
-            grandchildren_begin,
-            grandchildren_end,
-            eval,
-        ));
+        link.child = new_node_index;
+        let new_node_index = self.tree.add(to_be_expanded_index, eval, self.move_buf.drain(..));
         new_node_index
     }
 
