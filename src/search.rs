@@ -78,14 +78,7 @@ where
             has_unexplored_children,
         } = self.select_unexplored_node();
 
-        let (player, node_index, delta) = if !has_unexplored_children {
-            // Existing node
-            let player = game.current_player();
-            let delta = self
-                .policy
-                .reevaluate(game, &mut self.tree.evaluation_mut(node_index));
-            (player, node_index, delta)
-        } else {
+        let (player, node_index, delta) = if has_unexplored_children {
             // Create a new child node for the selected node and let `game` represent its state
             let new_node_index = self.expand(node_index, &mut game, rng);
 
@@ -101,6 +94,13 @@ where
                 .policy
                 .initial_delta(&self.tree.nodes[new_node_index].evaluation);
             (player, new_node_index, delta)
+        } else {
+            // Existing node
+            let player = game.current_player();
+            let delta = self
+                .policy
+                .reevaluate(game, &mut self.tree.evaluation_mut(node_index));
+            (player, node_index, delta)
         };
 
         self.backpropagation(node_index, delta, player);
