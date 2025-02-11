@@ -6,11 +6,11 @@ pub const ROOT_INDEX: usize = 0;
 pub struct Tree<N, L> {
     /// We store all the nodes of the tree in a vector to avoid allocations. We refer to the nodes
     /// using indices.
-    pub nodes: Vec<Node<N>>,
+    nodes: Vec<Node<N>>,
     /// Since we want to support Nodes with arbitrary many links, we store the links in their own
     /// vector. Each node will have a range in this vector indicated by a start and end index. We
     /// use usize::Max to indicate, that the node is not expanded yet.
-    pub links: Vec<Link<L>>,
+    links: Vec<Link<L>>,
 }
 
 impl<N, L> Tree<N, L>
@@ -71,7 +71,7 @@ where
     pub fn add(
         &mut self,
         parent_index: usize,
-        link_index: usize,
+        child_index: usize,
         payload: N,
         links: impl Iterator<Item = L>,
     ) -> usize {
@@ -83,6 +83,7 @@ where
         let children_end = self.links.len();
         let node = Node::new(parent_index, children_begin, children_end, payload);
         let node_index = self.nodes.len();
+        let link_index = self.nodes[parent_index].children_begin + child_index;
         self.links[link_index].child = node_index;
         self.nodes.push(node);
         node_index

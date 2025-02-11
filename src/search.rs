@@ -19,7 +19,7 @@ pub struct Search<G: TwoPlayerGame, P: Explorer<G>> {
     move_buf: Vec<G::Move>,
     /// In order to choose a child node to expand at random, we (re)use this buffer in order to
     /// avoid its repeated allocation.
-    candidate_link_index_buf: Vec<usize>,
+    candidate_children_buf: Vec<(G::Move, usize)>,
     /// Remember the best move from the root node. Only change this move if we find a better one.
     /// This is different from just picking one of the best moves, as we would not replace the best
     /// move with one that is just as good. The reason for this is that our evaluation does only
@@ -50,7 +50,7 @@ where
             game,
             tree,
             move_buf,
-            candidate_link_index_buf: Vec::new(),
+            candidate_children_buf: Vec::new(),
             policy,
             best_move,
         }
@@ -197,15 +197,24 @@ where
     ///
     /// Index of newly created child node.
     fn expand(&mut self, to_be_expanded_index: usize, game: &mut G, rng: &mut impl Rng) -> usize {
-        let link_index = self.pick_unexplored_child_of(to_be_expanded_index, rng);
-        let link = &mut self.tree.links[link_index];
+        self.candidate_children_buf.clear();
+        self.candidate_children_buf.extend(
+            self.tree.child_move_and_eval(to_be_expanded_index).enumerate().filter_map(|(i, (move_, eval))| {
+                if eval.is_none() {
+                    Some((move_, i))
+                } else {
+                    None
+                }
+            }),
+        );
+        let (move_, child_n) = self.candidate_children_buf.choose(rng).unwrap();
 
-        game.play(&link.move_);
+        game.play(move_);
         let new_node_game_state = game.state(&mut self.move_buf);
         let eval = P::Evaluation::init_from_game_state(&new_node_game_state);
         let new_node_index = self
             .tree
-            .add(to_be_expanded_index, link_index, eval, self.move_buf.drain(..));
+            .add(to_be_expanded_index, *child_n, eval, self.move_buf.drain(..));
         new_node_index
     }
 
@@ -257,20 +266,6 @@ where
             }
         }
         self.best_move = best_move;        
-    }
-
-    /// Link index of a random unexplored child of the selected node.
-    fn pick_unexplored_child_of(&mut self, node_index: usize, rng: &mut impl Rng) -> usize {
-        let node = &self.tree.nodes[node_index];
-        let child_links_indices = node.children_begin..node.children_end;
-        self.candidate_link_index_buf.clear();
-        self.candidate_link_index_buf.extend(
-            child_links_indices.filter(|&link_index| !self.tree.links[link_index].is_explored()),
-        );
-        self.candidate_link_index_buf
-            .choose(rng)
-            .copied()
-            .expect("To be expandend node must have unexplored children")
     }
 
     /// `true` if the node has at least one child which is not explored yet.
