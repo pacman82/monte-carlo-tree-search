@@ -157,7 +157,7 @@ where
         while !self.has_unexplored_children(current_node_index) {
             let Some(best_ucb) = self
                 .tree
-                .child_links(current_node_index)
+                .children(current_node_index)
                 // Filter all solved positions. We may assume link is explored, because of the
                 // entry condition of the while loop
                 .filter(|link| !self.tree.evaluation(link.child).is_solved())
@@ -270,7 +270,7 @@ where
 
     /// `true` if the node has at least one child which is not explored yet.
     fn has_unexplored_children(&self, node_index: usize) -> bool {
-        let mut it = self.tree.child_links(node_index);
+        let mut it = self.tree.children(node_index);
         it.any(|link| !link.is_explored())
     }
 }

@@ -33,7 +33,7 @@ where
     }
 
     /// Links to the children of the node
-    pub fn child_links(&self, node_index: usize) -> impl ExactSizeIterator<Item = Link<L>> + '_ {
+    pub fn children(&self, node_index: usize) -> impl ExactSizeIterator<Item = Link<L>> + '_ {
         let node = &self.nodes[node_index];
         self.links[node.children_begin..node.children_end]
             .iter()
@@ -49,7 +49,7 @@ where
     where
         L: Copy,
     {
-        self.child_links(node_index).map(|link| {
+        self.children(node_index).map(|link| {
             if link.is_explored() {
                 (link.move_, Some(&self.nodes[link.child].evaluation))
             } else {
@@ -110,7 +110,7 @@ where
         parent_index: usize,
         child_index: usize,
     ) -> impl Iterator<Item = Option<&N>> + '_ {
-        self.child_links(parent_index).filter_map(move |link| {
+        self.children(parent_index).filter_map(move |link| {
             if link.is_explored() {
                 if link.child == child_index {
                     None
@@ -129,17 +129,17 @@ where
 }
 
 #[derive(Debug)]
-pub struct Node<E> {
+struct Node<E> {
     /// Index of the parent node. The root node will be set to `usize::MAX`.
-    pub parent: usize,
+    parent: usize,
     /// Index into `Tree::links` where the children of this node start. `0` if the node does not
     /// have children.
-    pub children_begin: usize,
+    children_begin: usize,
     /// Index into `Tree::links` where the children of this node end, or more precise, the children
     /// of the next node would start, i.e. `children_begin + num_children`. `0` if the node does not
     /// have children.
-    pub children_end: usize,
-    pub evaluation: E,
+    children_end: usize,
+    evaluation: E,
 }
 
 impl<E> Node<E> {
