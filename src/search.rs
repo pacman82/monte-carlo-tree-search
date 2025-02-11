@@ -14,12 +14,6 @@ pub struct Search<G: TwoPlayerGame, P: Explorer<G>> {
     /// Game state of the root node.
     game: G,
     tree: Tree<P::Evaluation, G::Move>,
-    /// A buffer we use to store moves during node expansion. We have this as a member to avoid
-    /// repeated allocation.
-    move_buf: Vec<G::Move>,
-    /// In order to choose a child node to expand at random, we (re)use this buffer in order to
-    /// avoid its repeated allocation.
-    candidate_children_buf: Vec<(G::Move, usize)>,
     /// Remember the best move from the root node. Only change this move if we find a better one.
     /// This is different from just picking one of the best moves, as we would not replace the best
     /// move with one that is just as good. The reason for this is that our evaluation does only
@@ -32,6 +26,14 @@ pub struct Search<G: TwoPlayerGame, P: Explorer<G>> {
     /// Controls selection, evaluation and backpropagation.
     policy: P,
     
+    // Accidental state
+
+    /// A buffer we use to store moves during node expansion. We have this as a member to avoid
+    /// repeated allocation.
+    move_buf: Vec<G::Move>,
+    /// In order to choose a child node to expand at random, we (re)use this buffer in order to
+    /// avoid its repeated allocation.
+    candidate_children_buf: Vec<(G::Move, usize)>,
 }
 
 impl<G, P> Search<G, P>
