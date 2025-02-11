@@ -28,9 +28,10 @@ pub struct Search<G: TwoPlayerGame, P: Explorer<G>> {
     /// earliest, is likely the best play a human would choose, and on the other hand, the position
     /// we would take the longest to realize it is a loose, is likely the one which allows the
     /// opponent to make the most mistakes.
-    best_link: Option<usize>,
+    best_move: Option<G::Move>,
     /// Controls selection, evaluation and backpropagation.
     policy: P,
+    
 }
 
 impl<G, P> Search<G, P>
@@ -44,14 +45,14 @@ where
         let tree = Tree::new(estimated_outcome, move_buf.drain(..));
         // Choose the first move as the best move to start, only so, that if [`Self::best_move`] is
         // called, before the first playout, it will return a move and not `None`.
-        let best_link = if tree.links.is_empty() { None } else { Some(0) };
+        let best_move = tree.child_move_and_eval(ROOT_INDEX).next().map(|(move_, _)| move_);
         Self {
             game,
             tree,
             move_buf,
             candidate_link_index_buf: Vec::new(),
-            best_link,
             policy,
+            best_move,
         }
     }
 
@@ -104,14 +105,13 @@ where
         };
 
         self.backpropagation(node_index, delta, player);
-        self.update_best_link();
+        self.update_best_move();
         true
     }
 
     /// Picks one of the best moves for the current player. `None` if the root node has no children.
     pub fn best_move(&self) -> Option<G::Move> {
-        self.best_link
-            .map(|link_index| self.tree.links[link_index].move_)
+        self.best_move
     }
 
     pub fn num_nodes(&self) -> usize {
@@ -202,13 +202,10 @@ where
 
         game.play(&link.move_);
         let new_node_game_state = game.state(&mut self.move_buf);
-        // Index there new node is created
-        let new_node_index = self.tree.nodes.len();
         let eval = P::Evaluation::init_from_game_state(&new_node_game_state);
-        link.child = new_node_index;
         let new_node_index = self
             .tree
-            .add(to_be_expanded_index, eval, self.move_buf.drain(..));
+            .add(to_be_expanded_index, link_index, eval, self.move_buf.drain(..));
         new_node_index
     }
 
@@ -233,32 +230,33 @@ where
         }
     }
 
-    fn update_best_link(&mut self) {
+    fn update_best_move(&mut self) {
         let current_player = self.game.current_player();
-        let root = &self.tree.nodes[0];
-        for link_index in root.children_begin..root.children_end {
-            if self.best_link.is_none() {
-                self.best_link = Some(link_index);
+        let unexplored_bias = self.policy.unexplored_bias();
+        // `true` if a evaluates to better or equal than b
+        let cmp_eval = |a: Option<&P::Evaluation>, b: Option<&P::Evaluation>|{
+            let a = a.unwrap_or(&unexplored_bias);
+            let b = b.unwrap_or(&unexplored_bias);
+            a.cmp_for(b, current_player)
+        };
+
+        let mut best_eval = None;
+        let mut best_move = None;
+        for (move_, eval) in self.tree.child_move_and_eval(ROOT_INDEX) {
+            // First pass through loop
+            if best_move.is_none() {
+                best_eval = eval;
+                best_move = Some(move_);
                 continue;
             }
-            let candidate_evaluation = self.evaluation_by_link_index(link_index);
-            let best_so_far_evaluation = self.evaluation_by_link_index(self.best_link.unwrap());
-            if candidate_evaluation.cmp_for(&best_so_far_evaluation, current_player)
-                == Ordering::Greater
-            {
-                self.best_link = Some(link_index);
+            let cmp = cmp_eval(eval, best_eval);
+            let should_replace_best = if move_ == self.best_move().unwrap() { cmp != Ordering::Less } else { cmp == Ordering::Greater };
+            if should_replace_best {
+                best_move = Some(move_);
+                best_eval = eval;
             }
         }
-    }
-
-    /// Evaluation of a node the link directs to. Handles unexplored nodes.
-    fn evaluation_by_link_index(&self, link_index: usize) -> P::Evaluation {
-        let link = self.tree.links[link_index];
-        if link.is_explored() {
-            self.tree.nodes[link.child].evaluation
-        } else {
-            self.policy.unexplored_bias()
-        }
+        self.best_move = best_move;        
     }
 
     /// Link index of a random unexplored child of the selected node.

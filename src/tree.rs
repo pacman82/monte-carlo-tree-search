@@ -68,10 +68,10 @@ where
         &mut self.nodes[node_index].evaluation
     }
 
-    /// **Attention:** Currently this method does **not** update the child link of the parent node.
     pub fn add(
         &mut self,
         parent_index: usize,
+        link_index: usize,
         payload: N,
         links: impl Iterator<Item = L>,
     ) -> usize {
@@ -83,6 +83,7 @@ where
         let children_end = self.links.len();
         let node = Node::new(parent_index, children_begin, children_end, payload);
         let node_index = self.nodes.len();
+        self.links[link_index].child = node_index;
         self.nodes.push(node);
         node_index
     }
