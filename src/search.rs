@@ -214,11 +214,11 @@ where
 
     fn backpropagation(&mut self, node_index: usize, mut delta: P::Delta, mut player: Player) {
         let mut current_child_index = node_index;
-        let mut maybe_current_index = self.tree.nodes[node_index].parent_index();
+        let mut maybe_current_index = self.tree.parent_index(node_index);
         while let Some(current_node_index) = maybe_current_index {
             player.flip();
 
-            let mut current_evaluation = self.tree.nodes[current_node_index].evaluation;
+            let mut current_evaluation = *self.tree.evaluation(current_node_index);
             delta = self.policy.update(
                 &mut current_evaluation,
                 self.tree
@@ -227,10 +227,9 @@ where
                 delta,
                 player,
             );
-            let node = &mut self.tree.nodes[current_node_index];
             current_child_index = current_node_index;
-            node.evaluation = current_evaluation;
-            maybe_current_index = node.parent_index();
+            *self.tree.evaluation_mut(current_node_index) = current_evaluation;
+            maybe_current_index = self.tree.parent_index(current_node_index);
         }
     }
 

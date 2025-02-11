@@ -120,6 +120,10 @@ where
             }
         })
     }
+
+    pub fn parent_index(&self, node_index: usize) -> Option<usize> {
+        self.nodes[node_index].parent_index()
+    }
 }
 
 #[derive(Debug)]
