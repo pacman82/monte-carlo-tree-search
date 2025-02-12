@@ -7,7 +7,7 @@ use crate::{
 /// Control selection, evaluation and backpropagation.
 pub trait Explorer<G: TwoPlayerGame> {
     /// The type of evaluation returned by the bias.
-    type Evaluation: Evaluation;
+    type Evaluation: Evaluation + 'static;
 
     /// Change propagated upwards during backpropagation.
     type Delta;
@@ -22,10 +22,10 @@ pub trait Explorer<G: TwoPlayerGame> {
     /// Invoked then selection yields a node that has been visited before.
     fn reevaluate(&mut self, game: G, evaluation: &mut Self::Evaluation) -> Self::Delta;
 
-    fn selected_child_pos(
-        &mut self,
+    fn selected_child_pos<'a>(
+        &self,
         parent_eval: &Self::Evaluation,
-        child_evals: impl ExactSizeIterator<Item = Self::Evaluation>,
+        child_evals: impl ExactSizeIterator<Item = &'a Self::Evaluation>,
         selecting_player: Player,
     ) -> Option<usize> {
         child_evals

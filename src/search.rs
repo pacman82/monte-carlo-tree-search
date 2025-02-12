@@ -25,9 +25,8 @@ pub struct Search<G: TwoPlayerGame, P: Explorer<G>> {
     best_move: Option<G::Move>,
     /// Controls selection, evaluation and backpropagation.
     policy: P,
-    
-    // Accidental state
 
+    // Accidental state
     /// A buffer we use to store moves during node expansion. We have this as a member to avoid
     /// repeated allocation.
     move_buf: Vec<G::Move>,
@@ -47,7 +46,10 @@ where
         let tree = Tree::new(estimated_outcome, move_buf.drain(..));
         // Choose the first move as the best move to start, only so, that if [`Self::best_move`] is
         // called, before the first playout, it will return a move and not `None`.
-        let best_move = tree.child_move_and_eval(ROOT_INDEX).next().map(|(move_, _)| move_);
+        let best_move = tree
+            .child_move_and_eval(ROOT_INDEX)
+            .next()
+            .map(|(move_, _)| move_);
         Self {
             game,
             tree,
@@ -157,33 +159,23 @@ where
         let mut current_node_index = 0;
         let mut game = self.game.clone();
         while !self.has_unexplored_children(current_node_index) {
-            let Some(best_ucb) = self
-                .tree
-                .children(current_node_index)
-                // Filter all solved positions. We may assume link is explored, because of the
-                // entry condition of the while loop
-                .filter(|link| !self.tree.evaluation(link.child).is_solved())
-                .max_by(|a, b| {
-                    let selecting_player = game.current_player();
-                    let a = self.tree.evaluation(a.child).selection_weight(
-                        self.tree.evaluation(current_node_index),
-                        selecting_player,
-                    );
-                    let b = self.tree.evaluation(b.child).selection_weight(
-                        self.tree.evaluation(current_node_index),
-                        selecting_player,
-                    );
-                    a.partial_cmp(&b).unwrap()
-                })
-            else {
+            let selecting_player = game.current_player();
+            let Some(pos) = self.policy.selected_child_pos(
+                self.tree.evaluation(current_node_index),
+                self.tree
+                    .child_move_and_eval(current_node_index)
+                    .map(|(_move, eval)| eval.unwrap()),
+                selecting_player,
+            ) else {
                 return Selection {
                     node_index: current_node_index,
                     board: game,
                     has_unexplored_children: false,
                 };
             };
-            game.play(&best_ucb.move_);
-            current_node_index = best_ucb.child;
+            let link = self.tree.children(current_node_index).nth(pos).unwrap();
+            game.play(&link.move_);
+            current_node_index = link.child;
         }
         Selection {
             node_index: current_node_index,
@@ -201,22 +193,28 @@ where
     fn expand(&mut self, to_be_expanded_index: usize, game: &mut G, rng: &mut impl Rng) -> usize {
         self.candidate_children_buf.clear();
         self.candidate_children_buf.extend(
-            self.tree.child_move_and_eval(to_be_expanded_index).enumerate().filter_map(|(i, (move_, eval))| {
-                if eval.is_none() {
-                    Some((move_, i))
-                } else {
-                    None
-                }
-            }),
+            self.tree
+                .child_move_and_eval(to_be_expanded_index)
+                .enumerate()
+                .filter_map(|(i, (move_, eval))| {
+                    if eval.is_none() {
+                        Some((move_, i))
+                    } else {
+                        None
+                    }
+                }),
         );
         let (move_, child_n) = self.candidate_children_buf.choose(rng).unwrap();
 
         game.play(move_);
         let new_node_game_state = game.state(&mut self.move_buf);
         let eval = P::Evaluation::init_from_game_state(&new_node_game_state);
-        let new_node_index = self
-            .tree
-            .add(to_be_expanded_index, *child_n, eval, self.move_buf.drain(..));
+        let new_node_index = self.tree.add(
+            to_be_expanded_index,
+            *child_n,
+            eval,
+            self.move_buf.drain(..),
+        );
         new_node_index
     }
 
@@ -245,7 +243,7 @@ where
         let current_player = self.game.current_player();
         let unexplored_bias = self.policy.unexplored_bias();
         // `true` if a evaluates to better or equal than b
-        let cmp_eval = |a: Option<&P::Evaluation>, b: Option<&P::Evaluation>|{
+        let cmp_eval = |a: Option<&P::Evaluation>, b: Option<&P::Evaluation>| {
             let a = a.unwrap_or(&unexplored_bias);
             let b = b.unwrap_or(&unexplored_bias);
             a.cmp_for(b, current_player)
@@ -261,13 +259,17 @@ where
                 continue;
             }
             let cmp = cmp_eval(eval, best_eval);
-            let should_replace_best = if move_ == self.best_move().unwrap() { cmp != Ordering::Less } else { cmp == Ordering::Greater };
+            let should_replace_best = if move_ == self.best_move().unwrap() {
+                cmp != Ordering::Less
+            } else {
+                cmp == Ordering::Greater
+            };
             if should_replace_best {
                 best_move = Some(move_);
                 best_eval = eval;
             }
         }
-        self.best_move = best_move;        
+        self.best_move = best_move;
     }
 
     /// `true` if the node has at least one child which is not explored yet.
