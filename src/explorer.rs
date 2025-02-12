@@ -22,6 +22,23 @@ pub trait Explorer<G: TwoPlayerGame> {
     /// Invoked then selection yields a node that has been visited before.
     fn reevaluate(&mut self, game: G, evaluation: &mut Self::Evaluation) -> Self::Delta;
 
+    fn selected_child_pos(
+        &mut self,
+        parent_eval: &Self::Evaluation,
+        child_evals: impl ExactSizeIterator<Item = Self::Evaluation>,
+        selecting_player: Player,
+    ) -> Option<usize> {
+        child_evals
+            .enumerate()
+            .filter(|(_pos, eval)| !eval.is_solved())
+            .max_by(|&(_pos_a, eval_a), &(_pos_b, eval_b)| {
+                let a = eval_a.selection_weight(parent_eval, selecting_player);
+                let b = eval_b.selection_weight(parent_eval, selecting_player);
+                a.partial_cmp(&b).unwrap()
+            })
+            .map(|(pos, _)| pos)
+    }
+
     /// Called during backpropagation. Updates the evaluation of a node based on a propagated delta
     /// emitted by the update of a child node. In addition to that, we can also take the evaluations
     /// of the siblings of the changed child into account. The method changes the evaluation of the

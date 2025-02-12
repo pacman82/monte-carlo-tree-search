@@ -71,7 +71,7 @@ where
     pub fn add(
         &mut self,
         parent_index: usize,
-        child_index: usize,
+        child_number: usize,
         payload: N,
         links: impl Iterator<Item = L>,
     ) -> usize {
@@ -83,7 +83,7 @@ where
         let children_end = self.links.len();
         let node = Node::new(parent_index, children_begin, children_end, payload);
         let node_index = self.nodes.len();
-        let link_index = self.nodes[parent_index].children_begin + child_index;
+        let link_index = self.nodes[parent_index].children_begin + child_number;
         self.links[link_index].child = node_index;
         self.nodes.push(node);
         node_index
