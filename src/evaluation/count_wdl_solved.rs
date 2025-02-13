@@ -48,6 +48,13 @@ impl CountWdlSolved {
             }
         }
     }
+
+    pub fn undecided(&self) -> Option<&CountWdl> {
+        match self {
+            CountWdlSolved::Win(_) | CountWdlSolved::Draw => None,
+            CountWdlSolved::Undecided(count_wdl) => Some(count_wdl),
+        }
+    }
 }
 
 impl Evaluation for CountWdlSolved {

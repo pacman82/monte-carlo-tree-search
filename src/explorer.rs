@@ -22,6 +22,8 @@ pub trait Explorer<G: TwoPlayerGame> {
     /// Invoked then selection yields a node that has been visited before.
     fn reevaluate(&mut self, game: G, evaluation: &mut Self::Evaluation) -> Self::Delta;
 
+    /// The position of the nth child, which is selected by the explorer. Only used on nodes with no
+    /// unexplored children.
     fn selected_child_pos<'a>(
         &self,
         parent_eval: &Self::Evaluation,
@@ -114,16 +116,15 @@ where
 
     fn selected_child_pos<'a>(
         &self,
-        parent_eval: &Self::Evaluation,
-        child_evals: impl ExactSizeIterator<Item = &'a Self::Evaluation>,
+        parent_eval: &CountWdl,
+        child_evals: impl ExactSizeIterator<Item = &'a CountWdl>,
         selecting_player: Player,
     ) -> Option<usize> {
         child_evals
             .enumerate()
-            .filter(|(_pos, eval)| !eval.is_solved())
             .max_by(|&(_pos_a, eval_a), &(_pos_b, eval_b)| {
-                let a = eval_a.selection_weight(parent_eval, selecting_player);
-                let b = eval_b.selection_weight(parent_eval, selecting_player);
+                let a = eval_a.ucb(parent_eval.total() as f32, selecting_player);
+                let b = eval_b.ucb(parent_eval.total() as f32, selecting_player);
                 a.partial_cmp(&b).unwrap()
             })
             .map(|(pos, _)| pos)
@@ -295,8 +296,14 @@ where
             .enumerate()
             .filter(|(_pos, eval)| !eval.is_solved())
             .max_by(|&(_pos_a, eval_a), &(_pos_b, eval_b)| {
-                let a = eval_a.selection_weight(parent_eval, selecting_player);
-                let b = eval_b.selection_weight(parent_eval, selecting_player);
+                let a = eval_a
+                    .undecided()
+                    .unwrap()
+                    .ucb(parent_eval.total() as f32, selecting_player);
+                let b = eval_b
+                    .undecided()
+                    .unwrap()
+                    .ucb(parent_eval.total() as f32, selecting_player);
                 a.partial_cmp(&b).unwrap()
             })
             .map(|(pos, _)| pos)
