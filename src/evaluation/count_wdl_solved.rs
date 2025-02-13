@@ -55,6 +55,13 @@ impl CountWdlSolved {
             CountWdlSolved::Undecided(count_wdl) => Some(count_wdl),
         }
     }
+
+    pub fn is_solved(&self) -> bool {
+        match self {
+            CountWdlSolved::Win(_) | CountWdlSolved::Draw => true,
+            CountWdlSolved::Undecided(_) => false,
+        }
+    }
 }
 
 impl Evaluation for CountWdlSolved {
@@ -94,7 +101,7 @@ impl Evaluation for CountWdlSolved {
         }
     }
 
-    fn is_solved(&self) -> bool {
+    fn is_solved_legacy(&self) -> bool {
         match self {
             CountWdlSolved::Win(_) | CountWdlSolved::Draw => true,
             CountWdlSolved::Undecided(_) => false,

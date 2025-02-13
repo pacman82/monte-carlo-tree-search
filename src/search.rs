@@ -73,7 +73,7 @@ where
     /// Playout one cycle of selection, expansion, simulation and backpropagation. `true` if the
     /// playout may have changed the evaluation of the root, `false` if the game is already solved.
     pub fn playout(&mut self, rng: &mut impl Rng) -> bool {
-        if self.tree.evaluation(ROOT_INDEX).is_solved() {
+        if self.policy.is_solved(self.tree.evaluation(ROOT_INDEX)) {
             return false;
         }
 
@@ -91,7 +91,7 @@ where
             let player = game.current_player();
 
             // If the game is not in a terminal state, start a simulation to gain an initial estimate
-            if !self.tree.evaluation(new_node_index).is_solved() {
+            if !self.tree.evaluation(new_node_index).is_solved_legacy() {
                 let bias = self.policy.bias(game, rng);
                 *self.tree.evaluation_mut(new_node_index) = bias;
             }

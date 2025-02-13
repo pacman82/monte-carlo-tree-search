@@ -20,7 +20,7 @@ pub trait Evaluation: Copy {
 
     /// Solved states will be ignored during selection phase. If there are no unsolved nodes left
     /// in the tree the search will stop.
-    fn is_solved(&self) -> bool;
+    fn is_solved_legacy(&self) -> bool;
 
     /// Creating an initial evaluation for the root node, or before the first simulation. Can be
     /// used to handle terminal states.

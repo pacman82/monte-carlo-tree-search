@@ -77,7 +77,7 @@ impl Evaluation for CountWdl {
             .unwrap()
     }
 
-    fn is_solved(&self) -> bool {
+    fn is_solved_legacy(&self) -> bool {
         false
     }
 
