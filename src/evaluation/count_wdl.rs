@@ -77,10 +77,6 @@ impl Evaluation for CountWdl {
             .unwrap()
     }
 
-    fn selection_weight(&self, parent_eval: &Self, selecting_player: Player) -> f32 {
-        self.ucb(parent_eval.total() as f32, selecting_player)
-    }
-
     fn is_solved(&self) -> bool {
         false
     }

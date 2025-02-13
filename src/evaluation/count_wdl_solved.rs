@@ -94,21 +94,6 @@ impl Evaluation for CountWdlSolved {
         }
     }
 
-    fn selection_weight(&self, parent_eval: &CountWdlSolved, selecting_player: Player) -> f32 {
-        let total_visits_parent = parent_eval.total() as f32;
-        match self {
-            CountWdlSolved::Undecided(count) => count.ucb(total_visits_parent, selecting_player),
-            CountWdlSolved::Draw => 0.5,
-            CountWdlSolved::Win(winning_player) => {
-                if selecting_player == *winning_player {
-                    f32::MAX
-                } else {
-                    0.0
-                }
-            }
-        }
-    }
-
     fn is_solved(&self) -> bool {
         match self {
             CountWdlSolved::Win(_) | CountWdlSolved::Draw => true,

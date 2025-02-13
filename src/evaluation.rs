@@ -18,10 +18,6 @@ pub trait Evaluation: Copy {
     /// update the best move found so far after each playout.
     fn cmp_for(&self, other: &Self, player: Player) -> Ordering;
 
-    /// A weight used to decide how much we want to explore this node, compared to its siblings.
-    /// Higher weightns make a node more likely to be selected.
-    fn selection_weight(&self, parent_eval: &Self, selecting_player: Player) -> f32;
-
     /// Solved states will be ignored during selection phase. If there are no unsolved nodes left
     /// in the tree the search will stop.
     fn is_solved(&self) -> bool;
