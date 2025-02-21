@@ -90,11 +90,6 @@ where
             // Player whom gets to choose the next turn in the board the (new) leaf node represents.
             let player = game.current_player();
 
-            // If the game is not in a terminal state, start a simulation to gain an initial estimate
-            if !self.tree.evaluation(new_node_index).is_solved_legacy() {
-                let bias = self.policy.bias(game, rng);
-                *self.tree.evaluation_mut(new_node_index) = bias;
-            }
             let delta = self
                 .policy
                 .initial_delta(self.tree.evaluation(new_node_index));
@@ -208,7 +203,13 @@ where
 
         game.play(move_);
         let new_node_game_state = game.state(&mut self.move_buf);
-        let eval = P::Evaluation::init_from_game_state(&new_node_game_state);
+        let eval = if new_node_game_state.is_terminal() {
+            P::Evaluation::init_from_game_state(&new_node_game_state)
+        } else {
+            // If the game is not in a terminal state, start a simulation to gain an initial
+            // estimate
+            self.policy.bias(game.clone(), rng)
+        };
         let new_node_index = self.tree.add(
             to_be_expanded_index,
             *child_n,

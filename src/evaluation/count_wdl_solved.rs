@@ -101,13 +101,6 @@ impl Evaluation for CountWdlSolved {
         }
     }
 
-    fn is_solved_legacy(&self) -> bool {
-        match self {
-            CountWdlSolved::Win(_) | CountWdlSolved::Draw => true,
-            CountWdlSolved::Undecided(_) => false,
-        }
-    }
-
     fn init_from_game_state<M>(state: &GameState<'_, M>) -> Self {
         match state {
             GameState::Moves(_) => CountWdlSolved::Undecided(CountWdl::default()),

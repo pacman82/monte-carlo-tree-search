@@ -18,10 +18,6 @@ pub trait Evaluation: Copy {
     /// update the best move found so far after each playout.
     fn cmp_for(&self, other: &Self, player: Player) -> Ordering;
 
-    /// Solved states will be ignored during selection phase. If there are no unsolved nodes left
-    /// in the tree the search will stop.
-    fn is_solved_legacy(&self) -> bool;
-
     /// Creating an initial evaluation for the root node, or before the first simulation. Can be
     /// used to handle terminal states.
     fn init_from_game_state<M>(state: &GameState<'_, M>) -> Self;

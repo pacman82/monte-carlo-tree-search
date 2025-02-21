@@ -77,10 +77,6 @@ impl Evaluation for CountWdl {
             .unwrap()
     }
 
-    fn is_solved_legacy(&self) -> bool {
-        false
-    }
-
     fn init_from_game_state<M>(state: &GameState<'_, M>) -> Self {
         match state {
             GameState::WinPlayerOne => CountWdl {

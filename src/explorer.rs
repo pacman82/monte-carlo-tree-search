@@ -47,7 +47,8 @@ pub trait Explorer<G: TwoPlayerGame> {
     /// Initial delto for backpropagation based on the bias found for the new node.
     fn initial_delta(&self, new_evaluation: &Self::Evaluation) -> Self::Delta;
 
-    /// Used to short circut playouts in case root node is solved
+    /// Solved states will be ignored during selection phase. If there are no unsolved nodes left in
+    /// the tree the search will stop.
     fn is_solved(&self, evaluation: &Self::Evaluation) -> bool;
 }
 
@@ -132,7 +133,7 @@ where
             })
             .map(|(pos, _)| pos)
     }
-    
+
     fn is_solved(&self, _evaluation: &Self::Evaluation) -> bool {
         false
     }
@@ -315,7 +316,7 @@ where
             })
             .map(|(pos, _)| pos)
     }
-    
+
     fn is_solved(&self, evaluation: &Self::Evaluation) -> bool {
         evaluation.is_solved()
     }
