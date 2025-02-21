@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0](https://github.com/pacman82/monte-carlo-tree-search/compare/v0.2.0...v0.3.0) - 2025-02-21
+
+### Fixed
+
+- [**breaking**] Terminal nodes are now updated for Ucb Explorer
+
+### Other
+
+- [**breaking**] Remove usage of is_solved_legacy
+- [**breaking**] Introduce Explore::is_solved
+- [**breaking**] Remove Evaluation::selection_weight
+- [**breaking**] Stop using selection_weight
+- [**breaking**] Remove default implementation for select_child_pos
+- [**breaking**] Use select child pos
+- Introduce Evaluation::selected_child_pos
+- Mark accidental state in Search
+- Node is private
+- Tree members now private
+- Store best move in search, rather than best link
+- Remove further direct access to nodes array outside of tree module
+- fix lints
+- Introduce Tree::add
+- use Tree::evaluation instead of direct access to nodes
+- Assert Ucb playing TicTacToe against itself ends in draw
+- flip negation in if
+- if branches
+- pass delta explicitly to backpropagation
+- [**breaking**] Rename trait Policy -> Exploror
+- [**breaking**] Move update to policy
+- Introduce Tree::child_move_and_eval
+- Introduce tree::new
+- move child_links to Tree
+- [**breaking**] Rename Tree -> Search
+
 ## [0.2.0](https://github.com/pacman82/monte-carlo-tree-search/compare/v0.1.1...v0.2.0) - 2025-02-06
 
 ### Added
