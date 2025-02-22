@@ -1,10 +1,10 @@
 use std::cmp::Ordering;
 
-use rand::{seq::IndexedRandom as _, Rng};
+use rand::{Rng, seq::IndexedRandom as _};
 
 use crate::{
-    tree::{Tree, ROOT_INDEX},
     Evaluation, Explorer, Player, TwoPlayerGame,
+    tree::{ROOT_INDEX, Tree},
 };
 
 /// A tree there the nodes represent game states and the links represent moves. The tree does only

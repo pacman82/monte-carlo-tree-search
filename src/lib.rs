@@ -8,7 +8,7 @@ mod two_player_game;
 pub use self::{
     evaluation::{CountWdl, CountWdlSolved, CountWdlSolvedDelta, Evaluation},
     explorer::{
-        random_play, CountWdlBias, CountWdlSolvedBias, Explorer, RandomPlayout, Ucb, UcbSolver,
+        CountWdlBias, CountWdlSolvedBias, Explorer, RandomPlayout, Ucb, UcbSolver, random_play,
     },
     player::Player,
     search::Search,

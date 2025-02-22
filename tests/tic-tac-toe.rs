@@ -4,7 +4,7 @@ use monte_carlo_tree_search::{
     CountWdlSolved, Explorer, GameState, Player, RandomPlayout, Search, TwoPlayerGame, Ucb,
     UcbSolver,
 };
-use rand::{rngs::StdRng, SeedableRng as _};
+use rand::{SeedableRng as _, rngs::StdRng};
 use tic_tac_toe_board::{CellIndex, TicTacToeState};
 
 #[test]

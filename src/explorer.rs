@@ -1,4 +1,4 @@
-use rand::{seq::IndexedRandom as _, Rng};
+use rand::{Rng, seq::IndexedRandom as _};
 
 use crate::{
     CountWdl, CountWdlSolved, CountWdlSolvedDelta, Evaluation, GameState, Player, TwoPlayerGame,
@@ -389,21 +389,21 @@ where
                     wins_player_one: 1,
                     wins_player_two: 0,
                     draws: 0,
-                }
+                };
             }
             GameState::WinPlayerTwo => {
                 break CountWdl {
                     wins_player_one: 0,
                     wins_player_two: 1,
                     draws: 0,
-                }
+                };
             }
             GameState::Draw => {
                 break CountWdl {
                     wins_player_one: 0,
                     wins_player_two: 0,
                     draws: 1,
-                }
+                };
             }
         }
     }

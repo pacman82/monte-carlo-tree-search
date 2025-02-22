@@ -9,7 +9,7 @@ use monte_carlo_tree_search::{
     CountWdl, CountWdlSolved, CountWdlSolvedBias, Explorer, GameState, Player, RandomPlayout,
     Search, TwoPlayerGame, UcbSolver,
 };
-use rand::{rngs::StdRng, seq::IndexedRandom as _, Rng, SeedableRng};
+use rand::{Rng, SeedableRng, rngs::StdRng, seq::IndexedRandom as _};
 
 #[test]
 fn play_move_connect_four() {
@@ -90,9 +90,10 @@ fn position_42442445555772222514171() {
         &mut rng,
     );
     print_move_statistics(&tree);
-    assert!(tree
-        .eval_by_move()
-        .all(|(_move, eval)| eval == CountWdlSolved::Win(Player::One)));
+    assert!(
+        tree.eval_by_move()
+            .all(|(_move, eval)| eval == CountWdlSolved::Win(Player::One))
+    );
     assert_eq!(Column::from_index(0), tree.best_move().unwrap());
 }
 
@@ -289,7 +290,7 @@ impl CountWdlSolvedBias<ConnectFour> for ConnectFourBias {
                     return CountWdlSolved::Undecided(CountWdl {
                         draws: 1,
                         ..CountWdl::default()
-                    })
+                    });
                 }
             }
             if game.0.can_win_in_next_move() {
