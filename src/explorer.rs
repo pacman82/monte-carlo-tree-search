@@ -265,7 +265,7 @@ where
         };
 
         let (new_eval, delta) = match old_evaluation {
-            CountWdlSolved::Undecided(mut count) => {
+            &mut CountWdlSolved::Undecided(mut count) => {
                 count += propageted_count;
                 (
                     CountWdlSolved::Undecided(count),

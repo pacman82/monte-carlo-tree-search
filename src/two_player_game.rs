@@ -46,9 +46,6 @@ impl<M> GameState<'_, M> {
     }
 
     pub fn is_terminal(&self) -> bool {
-        match self {
-            GameState::Moves(_) => false,
-            _ => true,
-        }
+        !matches!(self, GameState::Moves(_))
     }
 }
