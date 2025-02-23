@@ -77,7 +77,7 @@ impl Evaluation for CountWdl {
             .unwrap()
     }
 
-    fn init_from_game_state<M>(state: &GameState<'_, M>) -> Self {
+    fn eval_for_terminal_state<M>(state: &GameState<'_, M>) -> Self {
         match state {
             GameState::WinPlayerOne => CountWdl {
                 wins_player_one: 1,
@@ -94,7 +94,9 @@ impl Evaluation for CountWdl {
                 wins_player_two: 0,
                 draws: 1,
             },
-            GameState::Moves(_) => CountWdl::default(),
+            GameState::Moves(_) => {
+                panic!("eval_for_terminal_state must not be called with non-terminal state")
+            }
         }
     }
 }

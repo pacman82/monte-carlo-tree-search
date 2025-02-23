@@ -101,9 +101,11 @@ impl Evaluation for CountWdlSolved {
         }
     }
 
-    fn init_from_game_state<M>(state: &GameState<'_, M>) -> Self {
+    fn eval_for_terminal_state<M>(state: &GameState<'_, M>) -> Self {
         match state {
-            GameState::Moves(_) => CountWdlSolved::Undecided(CountWdl::default()),
+            GameState::Moves(_) => {
+                panic!("eval for terminal state must not be called with non-terminal state")
+            }
             GameState::Draw => CountWdlSolved::Draw,
             GameState::WinPlayerOne => CountWdlSolved::Win(Player::One),
             GameState::WinPlayerTwo => CountWdlSolved::Win(Player::Two),

@@ -18,7 +18,8 @@ pub trait Explorer<G: TwoPlayerGame> {
     fn bias(&mut self, game: G, rng: &mut impl Rng) -> Self::Evaluation;
 
     /// Evaluation given to unexplored nodes for the purpose of choosing the best node from root.
-    /// This evaluation is not used during selection phase
+    /// This evaluation is not used during selection phase. This is also the initial evaluation
+    /// given to the root node, for non-terminal states.
     fn unexplored_bias(&self) -> Self::Evaluation;
 
     /// Invoked then selection yields a node that has been visited before.
@@ -46,7 +47,7 @@ pub trait Explorer<G: TwoPlayerGame> {
         choosing_player: Player,
     ) -> Self::Delta;
 
-    /// Initial delto for backpropagation based on the bias found for the new node.
+    /// Initial delta for backpropagation based on the bias found for the new node.
     fn initial_delta(&self, new_evaluation: &Self::Evaluation) -> Self::Delta;
 
     /// Solved states will be ignored during selection phase. If there are no unsolved nodes left in

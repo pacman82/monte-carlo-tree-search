@@ -20,5 +20,5 @@ pub trait Evaluation: Copy {
 
     /// Creating an initial evaluation for the root node, or before the first simulation. Can be
     /// used to handle terminal states.
-    fn init_from_game_state<M>(state: &GameState<'_, M>) -> Self;
+    fn eval_for_terminal_state<M>(state: &GameState<'_, M>) -> Self;
 }

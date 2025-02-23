@@ -42,7 +42,12 @@ where
 {
     pub fn new(game: G, policy: P) -> Self {
         let mut move_buf = Vec::new();
-        let estimated_outcome = P::Evaluation::init_from_game_state(&game.state(&mut move_buf));
+        let game_state = &game.state(&mut move_buf);
+        let estimated_outcome = if game_state.is_terminal() {
+            Evaluation::eval_for_terminal_state(game_state)
+        } else {
+            policy.unexplored_bias()
+        };
         let tree = Tree::new(estimated_outcome, move_buf.drain(..));
         // Choose the first move as the best move to start, only so, that if [`Self::best_move`] is
         // called, before the first playout, it will return a move and not `None`.
@@ -204,7 +209,7 @@ where
         game.play(move_);
         let new_node_game_state = game.state(&mut self.move_buf);
         let eval = if new_node_game_state.is_terminal() {
-            P::Evaluation::init_from_game_state(&new_node_game_state)
+            P::Evaluation::eval_for_terminal_state(&new_node_game_state)
         } else {
             // If the game is not in a terminal state, start a simulation to gain an initial
             // estimate
