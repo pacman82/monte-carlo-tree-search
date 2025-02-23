@@ -1,3 +1,4 @@
+mod bayesian;
 mod ucb;
 
 use rand::{Rng, seq::IndexedRandom as _};
