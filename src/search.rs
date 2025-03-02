@@ -33,6 +33,10 @@ pub struct Search<G: TwoPlayerGame, P: Explorer<G>> {
     /// In order to choose a child node to expand at random, we (re)use this buffer in order to
     /// avoid its repeated allocation.
     candidate_children_buf: Vec<(G::Move, usize)>,
+    /// During the selection and expansion phase we use this vector to keep track of the nodes we
+    /// have visited. We use this during backpropagation to update all the nodes on "our way back"
+    /// to the root node.
+    path: Vec<usize>,
 }
 
 impl<G, P> Search<G, P>
@@ -62,6 +66,7 @@ where
             candidate_children_buf: Vec::new(),
             policy,
             best_move,
+            path: Vec::new(),
         }
     }
 
@@ -88,7 +93,9 @@ where
             has_unexplored_children,
         } = self.select_unexplored_node();
 
-        let (player, node_index, delta) = if has_unexplored_children {
+        debug_assert_eq!(*self.path.last().unwrap(), node_index);
+
+        let (player, delta) = if has_unexplored_children {
             // Create a new child node for the selected node and let `game` represent its state
             let new_node_index = self.expand(node_index, &mut game, rng);
 
@@ -98,17 +105,17 @@ where
             let delta = self
                 .policy
                 .initial_delta(self.tree.evaluation(new_node_index));
-            (player, new_node_index, delta)
+            (player, delta)
         } else {
             // Existing node
             let player = game.current_player();
             let delta = self
                 .policy
                 .reevaluate(game, self.tree.evaluation_mut(node_index));
-            (player, node_index, delta)
+            (player, delta)
         };
 
-        self.backpropagation(node_index, delta, player);
+        self.backpropagation(delta, player);
         self.update_best_move();
         true
     }
@@ -155,8 +162,10 @@ where
     /// # Return
     ///
     /// Index of the selected leaf node and the game state of the node.
-    fn select_unexplored_node(&self) -> Selection<G> {
-        let mut current_node_index = 0;
+    fn select_unexplored_node(&mut self) -> Selection<G> {
+        self.path.clear();
+        self.path.push(ROOT_INDEX);
+        let mut current_node_index = *self.path.last().unwrap();
         let mut game = self.game.clone();
         while !self.has_unexplored_children(current_node_index) {
             let selecting_player = game.current_player();
@@ -176,6 +185,7 @@ where
             let link = self.tree.children(current_node_index).nth(pos).unwrap();
             game.play(&link.move_);
             current_node_index = link.child;
+            self.path.push(current_node_index);
         }
         Selection {
             node_index: current_node_index,
@@ -221,12 +231,13 @@ where
             eval,
             self.move_buf.drain(..),
         );
+        self.path.push(new_node_index);
         new_node_index
     }
 
-    fn backpropagation(&mut self, node_index: usize, mut delta: P::Delta, mut player: Player) {
-        let mut current_child_index = node_index;
-        let mut maybe_current_index = self.tree.parent_index(node_index);
+    fn backpropagation(&mut self, mut delta: P::Delta, mut player: Player) {
+        let mut current_child_index = self.path.pop().unwrap();
+        let mut maybe_current_index = self.path.pop();
         while let Some(current_node_index) = maybe_current_index {
             player.flip();
 
@@ -241,7 +252,7 @@ where
             );
             current_child_index = current_node_index;
             *self.tree.evaluation_mut(current_node_index) = current_evaluation;
-            maybe_current_index = self.tree.parent_index(current_node_index);
+            maybe_current_index = self.path.pop();
         }
     }
 

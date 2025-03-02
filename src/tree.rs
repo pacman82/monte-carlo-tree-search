@@ -25,7 +25,7 @@ where
                 move_,
             })
             .collect();
-        let root = Node::new(usize::MAX, 0, links.len(), initial_root_payload);
+        let root = Node::new(0, links.len(), initial_root_payload);
         Self {
             nodes: vec![root],
             links,
@@ -81,7 +81,7 @@ where
             move_,
         }));
         let children_end = self.links.len();
-        let node = Node::new(parent_index, children_begin, children_end, payload);
+        let node = Node::new(children_begin, children_end, payload);
         let node_index = self.nodes.len();
         let link_index = self.nodes[parent_index].children_begin + child_number;
         self.links[link_index].child = node_index;
@@ -122,16 +122,10 @@ where
             }
         })
     }
-
-    pub fn parent_index(&self, node_index: usize) -> Option<usize> {
-        self.nodes[node_index].parent_index()
-    }
 }
 
 #[derive(Debug)]
 struct Node<E> {
-    /// Index of the parent node. The root node will be set to `usize::MAX`.
-    parent: usize,
     /// Index into `Tree::links` where the children of this node start. `0` if the node does not
     /// have children.
     children_begin: usize,
@@ -143,22 +137,12 @@ struct Node<E> {
 }
 
 impl<E> Node<E> {
-    pub fn new(
-        parent: usize,
-        children_begin: usize,
-        children_end: usize,
-        estimated_outcome: E,
-    ) -> Self {
+    pub fn new(children_begin: usize, children_end: usize, estimated_outcome: E) -> Self {
         Self {
-            parent,
             children_begin,
             children_end,
             evaluation: estimated_outcome,
         }
-    }
-
-    pub fn parent_index(&self) -> Option<usize> {
-        (self.parent != usize::MAX).then_some(self.parent)
     }
 }
 
