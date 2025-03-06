@@ -78,10 +78,12 @@ where
     ) -> Option<usize> {
         child_evals
             .enumerate()
-            .max_by(|&(_pos_a, eval_a), &(_pos_b, eval_b)| {
-                let a = eval_a.ucb(parent_eval.total() as f32, selecting_player);
-                let b = eval_b.ucb(parent_eval.total() as f32, selecting_player);
-                a.partial_cmp(&b).unwrap()
+            .map(|(pos, eval)| {
+                let ucb = eval.ucb(parent_eval.total() as f32, selecting_player);
+                (pos, ucb)
+            })
+            .max_by(|&(_pos_a, ucb_a), &(_pos_b, ucb_b)| {
+                ucb_a.partial_cmp(&ucb_b).unwrap()
             })
             .map(|(pos, _)| pos)
     }
@@ -255,17 +257,14 @@ where
         child_evals
             .enumerate()
             .filter(|(_pos, eval)| !eval.is_solved())
-            .max_by(|&(_pos_a, eval_a), &(_pos_b, eval_b)| {
-                let a = eval_a
+            .map(|(pos, eval)| {
+                let ucb = eval
                     .undecided()
                     .unwrap()
                     .ucb(parent_eval.total() as f32, selecting_player);
-                let b = eval_b
-                    .undecided()
-                    .unwrap()
-                    .ucb(parent_eval.total() as f32, selecting_player);
-                a.partial_cmp(&b).unwrap()
+                (pos, ucb)
             })
+            .max_by(|&(_pos_a, ucb_a), &(_pos_b, ucb_b)| ucb_a.partial_cmp(&ucb_b).unwrap())
             .map(|(pos, _)| pos)
     }
 
