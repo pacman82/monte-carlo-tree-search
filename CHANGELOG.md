@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0](https://github.com/pacman82/monte-carlo-tree-search/compare/v0.3.0...v0.4.0) - 2026-07-03
+
+### Other
+
+- *(deps)* bump rand from 0.10.1 to 0.10.2
+- *(deps)* bump actions/checkout from 6 to 7
+- *(deps)* bump rand from 0.10.0 to 0.10.1
+- *(deps)* bump rand from 0.9.1 to 0.10.0
+- *(deps)* bump actions/checkout from 5 to 6
+- *(deps)* bump actions/checkout from 4 to 5
+- *(deps)* bump rand from 0.9.0 to 0.9.1
+- extract ucb calculation in selection
+- Stop storing parent index in tree
+- [**breaking**] Evaluation::init_from_game_state -> Evaluation::eval_for_terminal_state
+- Extract ucb into own module
+- formating
+- Update to edition 2024
+
 ## [0.3.0](https://github.com/pacman82/monte-carlo-tree-search/compare/v0.2.0...v0.3.0) - 2025-02-21
 
 ### Fixed
